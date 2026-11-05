@@ -530,6 +530,7 @@ int bi_job_control(const std::vector<std::string> &a, ShellState &st) {
     if (kill(-job->pid, SIGCONT) < 0)
         return 1;
     job->stopped = false;
+    job->stopped_pids.clear();
     return a[0] == "bg" ? 0 : wait_for_job(*job, st, true);
 }
 } // namespace ang

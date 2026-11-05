@@ -122,13 +122,17 @@ void reap_jobs(ShellState &st) {
             pid_t result;
             while ((result = waitpid(pid, &ws, WNOHANG | WUNTRACED | WCONTINUED)) > 0) {
                 if (WIFSTOPPED(ws))
-                    job.stopped = true;
+                    job.stopped_pids.insert(pid);
                 else if (WIFCONTINUED(ws))
-                    job.stopped = false;
-                else
+                    job.stopped_pids.erase(pid);
+                else {
                     job.results[pid] = ws;
+                    job.stopped_pids.erase(pid);
+                }
             }
         }
+        job.stopped = !job.stopped_pids.empty() &&
+                      job.stopped_pids.size() + job.results.size() == job.pids.size();
         job.reaped = job.results.size() == job.pids.size();
         if (job.reaped && !job.pids.empty())
             job.status = decoded(job.results[job.pids.back()]);
@@ -149,9 +153,13 @@ int wait_for_job(ShellState::BgJob &job, ShellState &st, bool foreground) {
             break;
         }
         if (WIFSTOPPED(ws))
-            job.stopped = true;
-        else
+            job.stopped_pids.insert(pid);
+        else {
             job.results[pid] = ws;
+            job.stopped_pids.erase(pid);
+        }
+        job.stopped = !job.stopped_pids.empty() &&
+                      job.stopped_pids.size() + job.results.size() == job.pids.size();
     }
     if (st.interactive && foreground) {
         if (job.stopped) {

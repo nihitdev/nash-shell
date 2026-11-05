@@ -57,6 +57,15 @@ class TerminalTests(unittest.TestCase):
     def test_stop_resume(self):
         self.send(b'sleep 10\r');time.sleep(.2);self.send(b'\x1a');self.until(b'stopped');self.until_prompt()
         self.send(b'fg\r');time.sleep(.15);self.send(b'\x03');self.until_prompt(3)
+    def test_pipeline_stop_resume(self):
+        self.send(b'sleep 10 | cat\r');time.sleep(.2);self.send(b'\x1a')
+        self.until(b'stopped');self.until_prompt()
+        self.send(b'fg\r');time.sleep(.2)
+        if select.select([self.fd],[],[],.1)[0]:
+            output=os.read(self.fd,65536)
+            self.assertNotIn(b'\x1b[?2004h',output,'foreground pipeline returned before interrupt')
+        self.send(b'\x03');self.until_prompt(3)
+        self.command(b'echo $?',b'130')
     def test_multiline(self):
         self.send(b'echo "one\r');self.until(b'... ')
         self.send(b'two"\r');self.until(b'one\r\ntwo\r\n');self.until_prompt()

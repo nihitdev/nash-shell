@@ -48,8 +48,9 @@ history suggestions/search, bracketed paste and continuation input. History appe
 - Release: 25 execution tests passed in 2.154 s; 19 PTY tests passed in 6.746 s.
 - Installed with DESTDIR staging; installed `nash --version` and an execution pipeline succeeded.
 - clang-format 18.1.8 dry-run check passed, matching CI's formatter version.
-- clang-tidy 23 completed for integrations.cpp, executor.cpp and editor.cpp with exit 0 and
-  no diagnostics under the configured checks. Other translation units were not analyzed.
+- clang-tidy 23 completed for integrations.cpp, executor.cpp and editor.cpp with exit 0.
+  It reported nonfatal portability/style, signed-bitwise, optional-access and performance
+  warnings; it is not warning-clean. A follow-up run also covered shell.cpp.
 - Real installed Starship tested with temporary configs: status, Git modules, Unicode,
   multiline rendering. Fake CLI and PTY tests verify argv context, timeout/fallback,
   right requests, status preservation through hooks and no calls while typing.
@@ -83,3 +84,19 @@ are future work. Linux was tested; macOS and other POSIX systems remain planned.
 Next priorities: compound-command AST and semantics, broader job/signal/terminal stress testing,
 script arguments and expansion conformance, then structured optional-tool adapters and
 interactive performance measurements. Do not select Nash as a login shell yet.
+
+## Final job-control follow-up
+
+The final review added per-process stopped-state tracking so a two-stage pipeline consumes
+all stop notifications before returning terminal ownership. Both stages can then resume
+without a stale stop event returning the prompt early. Completion now excludes filenames
+containing terminal control characters. Two PTY cases cover pipeline stop/resume, under
+native and Starship prompts, bringing PTY coverage to 21 tests.
+
+After this change, Debug CTest passed all suites in 20.45 s and ASan/UBSan CTest passed all
+suites in 14.24 s. Both runs include the unit executable, 25 execution tests and 21 PTY tests.
+The Release binary was rebuilt. Benchmarks above were measured before this final
+job-control/completion-only follow-up. Formatting and diff-whitespace checks passed.
+
+GitHub Actions passed for both the implementation commit and the first report commit.
+The final follow-up's remote workflow is separate and can be inspected on GitHub.

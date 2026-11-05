@@ -6,6 +6,7 @@ Use CMake install; no prebuilt packages are distributed yet. Example staging:
 DESTDIR="$PWD/stage" cmake --install build --prefix /usr
 ```
 
-The package must depend on toml++ at build time, a C++23 runtime, and POSIX facilities.
+The package needs toml++ at build time, the matching C++ standard library and POSIX facilities.
+When toml++ is linked as a shared library, include its runtime package as a dependency too.
 Starship is optional. Preserve LICENSE with both copyright notices. Do not install upstream
 ang.sh binaries under the Nash name. Release artifacts must be built and tested from a Nash tag.

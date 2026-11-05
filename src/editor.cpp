@@ -142,6 +142,9 @@ static std::vector<std::string> complete(const std::string &prefix, bool first,
         std::error_code ec;
         for (const auto &entry : std::filesystem::directory_iterator(dir, ec)) {
             auto name = entry.path().filename().string();
+            if (std::any_of(name.begin(), name.end(),
+                            [](unsigned char c) { return c < 32 || c == 127; }))
+                continue;
             if (!name.starts_with(base) || (base.empty() && name.starts_with('.')))
                 continue;
             bool directory = entry.is_directory(ec);

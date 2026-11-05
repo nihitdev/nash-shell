@@ -1,6 +1,7 @@
 // env.h — shell state: variables, aliases, abbreviations, options.
 #pragma once
 #include <map>
+#include <set>
 #include <string>
 #include <sys/types.h>
 #include <termios.h>
@@ -57,6 +58,7 @@ struct ShellState {
         bool reaped = false;
         int status = 0;
         bool stopped = false;
+        std::set<pid_t> stopped_pids;
         std::vector<pid_t> pids;
         std::map<pid_t, int> results;
         termios modes{};
