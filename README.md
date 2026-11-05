@@ -36,21 +36,36 @@ cmake --build build --parallel
 cmake --install build
 ```
 
+## Learn Nash
+
+Start with the [user handbook](docs/README.md): [getting started](docs/GETTING-STARTED.md),
+[config.nash](docs/CONFIGURATION.md), [aliases](docs/ALIASES.md),
+[popular tools and Fastfetch](docs/TOOLS.md), [keys](docs/KEYBINDINGS.md), and
+[troubleshooting](docs/TROUBLESHOOTING.md).
+
+Your main configuration is `~/.config/nash/config.nash`, an executable Nash startup script:
+
+```sh
+config set prompt.engine native
+alias ll='ls -lah'
+has fastfetch && fastfetch
+```
+
+See the commented [example](examples/config.nash) before enabling optional tools.
+
 ## Starship: keep your existing prompt
 
 Nash uses its own native prompt by default. To opt into Starship later, select
-`engine = "starship"` in the configuration below. Nash then detects `starship` from PATH.
+`config set prompt.engine starship` in the configuration below. Nash then detects `starship` from PATH.
 Starship itself reads your existing
 `~/.config/starship.toml`, or `STARSHIP_CONFIG` when set. No conversion, duplicated prompt,
 Bash init script, or hardcoded Nerd Font symbols are required.
 
-Create `$XDG_CONFIG_HOME/nash/config.toml` (default `~/.config/nash/config.toml`):
+Create `$XDG_CONFIG_HOME/nash/config.nash` (default `~/.config/nash/config.nash`):
 
-```toml
-[prompt]
-engine = "starship"
-fallback = "native"
-timeout_ms = 1500
+```sh
+config set prompt.engine starship
+config set prompt.timeout_ms 1500
 ```
 
 Nash passes last status, per-stage pipeline statuses, command duration in milliseconds,
@@ -79,12 +94,13 @@ See [Starship's shell-agnostic integration guidance](https://starship.rs/faq/).
 - Syntax and command validation coloring, history ghost suggestions, path/executable Tab
   completion, Ctrl-R substring history search, Up/Down, Emacs editing keys, UTF-8 codepoint
   cursor movement, continuation input and bracketed paste.
-- TOML settings, native theme templates, explicit `precmd`, `preexec`, and `chpwd` hooks.
+- Script-based settings, native theme templates, explicit `precmd`, `preexec`, and `chpwd` hooks.
 
 POSIX-like assignment syntax is the default. `--ang` keeps the inherited `set NAME value`
 mode; `--posix` selects assignments again. Configuration is loaded only in interactive mode;
-`--no-config` disables it. Startup shell commands must be explicitly configured with
-`[startup].file`; legacy `config.ang` and automatic plugin directory loading are not used.
+`--no-config` disables it. Additional startup files can be loaded with
+`config set startup.file PATH` or `source PATH`. `config.nash` takes precedence over
+legacy `config.toml`; automatic plugin directory loading is not used.
 
 Aliases are expanded before parsing a logical command, as in the inherited implementation:
 define an alias on an earlier line before using it. Leading-space commands are omitted from
@@ -93,8 +109,8 @@ session memory; disk history is append-only and multiline records remain session
 
 ## Customization and tools
 
-See [examples/config.toml](examples/config.toml). The default engine is `native`; choose a
-`theme` after installation. Shipped templates: minimal, classic, modern, catppuccin,
+See [examples/config.nash](examples/config.nash). The default engine is `native`; choose a theme with
+`config set prompt.theme NAME` after installation. Shipped templates: minimal, classic, modern, catppuccin,
 rose-pine, tokyo-night, gruvbox, nord, dracula, monochrome, plus inherited themes.
 Native templates accept ANSI palette names and true-color `{#RRGGBB}` spans. `NO_COLOR` and `TERM=dumb` disable native and editor colors. Starship controls its own colors.
 
@@ -103,7 +119,7 @@ Keybindings map raw terminal sequences to `accept-suggestion`, `history-search`,
 Alt-Enter inserts a newline. Pasted newlines are buffered until Enter is pressed.
 
 The `integrations` builtin reports availability of Starship, Zoxide, FZF, Atuin, Direnv,
-Git, Eza, Bat, Yazi, Prism and yoo. **Only Starship has a native adapter.** The rest remain
+Git, Fastfetch, Eza, Bat, Yazi, Prism and yoo. **Only Starship has a native adapter.** The rest remain
 ordinary optional external commands. Hooks accept Nash commands; do not source Bash/Fish
 initialization scripts into Nash. See [integrations](docs/INTEGRATIONS.md).
 

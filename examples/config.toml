@@ -1,3 +1,4 @@
+# Legacy fallback only: prefer examples/config.nash.
 # ~/.config/nash/config.toml
 [prompt]
 engine = "native" # Change to "starship" to use your existing Starship configuration.

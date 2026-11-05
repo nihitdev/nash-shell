@@ -1,0 +1,34 @@
+# ~/.config/nash/config.nash — ordinary Nash commands, loaded on interactive startup.
+# Settings changed here persist for this shell session. Edit this file to keep changes.
+config set prompt.engine native
+config set colors.enabled true
+config set autosuggestions.enabled true
+config set highlighting.enabled true
+config set completion.enabled true
+config set history.enabled true
+config set history.limit 5000
+config set editor.autocd false
+
+# Aliases and environment variables.
+alias ll='ls -lah'
+alias gs='git status --short'
+# export EDITOR=nvim
+
+# Optional tools: only activate commands that exist on PATH.
+has eza && alias ll='eza -lah --icons=auto'
+has bat && alias view='bat --paging=never'
+# Uncomment to display system information when opening Nash:
+# has fastfetch && fastfetch
+
+# Opt into Starship later (it keeps its own starship.toml):
+# config set prompt.engine starship
+# Or select a native theme after installing Nash:
+# config set prompt.theme catppuccin
+
+# Optional hooks and keys. Single quotes defer variables until the hook runs.
+# has zoxide && config hook chpwd 'zoxide add "$PWD"'
+config bind Ctrl-F accept-suggestion
+config bind Ctrl-R history-search
+
+# Load another Nash file explicitly:
+# source ~/.config/nash/aliases.nash

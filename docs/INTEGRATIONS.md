@@ -5,16 +5,16 @@ The direct-capture helper limits output to 1 MiB and kills the helper process gr
 configured timeout. It uses `/dev/null` for stdin/stderr so prompt helpers do not steal input.
 
 `integrations` reports executable discovery; presence is not a claim of a working adapter.
-Zoxide, FZF, Atuin, Direnv, Git, Eza, Bat, Yazi, Prism and yoo run as external commands today.
+Zoxide, FZF, Atuin, Direnv, Git, Fastfetch, Eza, Bat, Yazi, Prism and yoo run as external commands today.
 Git prompt modules are implemented by Starship. Native branch/path Git completion is planned.
 
-Lifecycle hooks use arrays of Nash command strings:
+Lifecycle hooks use Nash command strings in `config.nash`:
 
-```toml
-[hooks]
-preexec = ["true"]
-precmd = ["true"]
-chpwd = ["zoxide add ."]
+```sh
+config hook preexec 'true'
+config hook precmd 'true'
+config unhook chpwd
+has zoxide && config hook chpwd 'zoxide add "$PWD"'
 ```
 
 The Zoxide example is a user-provided hook, not a native adapter; use it only when installed.

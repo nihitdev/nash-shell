@@ -1,5 +1,6 @@
 // builtins.cpp
 #include "builtins.h"
+#include "config.h"
 #include "executor.h"
 #include "integrations.h"
 #include "lexer.h"
@@ -37,12 +38,22 @@ bool is_parent_builtin(const std::string &name) {
            name == "abbr" || name == "posix" || name == "source" || name == "." ||
            name == "theme" || name == "autocd" || name == "history" || name == "read" ||
            name == "jobs" || name == "wait" || name == "fg" || name == "bg" ||
-           name == "nash-prompt" || name == "integrations";
+           name == "nash-prompt" || name == "integrations" || name == "config" || name == "has";
 }
 
 int run_builtin(const std::vector<std::string> &args, ShellState &st, bool *handled) {
     *handled = true;
     const std::string &c = args[0];
+    if (c == "config")
+        return bi_config(args, st);
+    if (c == "has") {
+        if (args.size() < 2)
+            return 2;
+        for (size_t i = 1; i < args.size(); ++i)
+            if (!find_executable(args[i]))
+                return 1;
+        return 0;
+    }
     if (c == "cd")
         return bi_cd(args, st);
     if (c == "exit" || c == "logout")
@@ -393,9 +404,9 @@ int bi_help(const std::vector<std::string> &, ShellState &) {
     std::cout << "Nash Shell " NASH_VERSION " — fork of ang.sh\n"
               << "Builtins: cd pwd exit echo export unset set alias unalias abbr posix\n"
               << "          source history help version true false type theme env printenv\n"
-              << "          read jobs fg bg wait integrations nash-prompt\n"
+              << "          read jobs fg bg wait integrations nash-prompt config has\n"
               << "Syntax: pipelines, redirections, && || ; &, assignments, quoting, $(...)\n"
-              << "Config: ~/.config/nash/config.toml; Starship uses existing starship.toml\n"
+              << "Config: ~/.config/nash/config.nash; Starship uses existing starship.toml\n"
               << "Keys: Tab completion, Right/Ctrl-F suggestion, Ctrl-R history, Ctrl-A/E/U/K/W\n"
               << "Functions, loops, if/case, heredocs and full POSIX compatibility are not "
                  "implemented.\n";

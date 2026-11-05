@@ -21,3 +21,8 @@ not a POSIX conformance or terminal-emulator compatibility certification.
 
 See the session report for actual runs. Do not infer a passing local run from the existence
 of tests or a workflow file.
+
+The documentation suite validates local handbook links and runs the shipped `config.nash`
+plus Fastfetch/alias recipes against isolated executable fixtures. It checks that optional
+startup output remains opt-in. This is recipe regression coverage, not a claim that every
+third-party terminal program has a native adapter or has been interactively tested.

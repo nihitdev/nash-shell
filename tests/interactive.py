@@ -6,9 +6,11 @@ class TerminalTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.root=pathlib.Path(self.temp.name)
         (self.root/'nash').mkdir()
-        config='[prompt]\nengine="'+getattr(self,'engine','native')+'"\nleft="N> "\n[colors]\nenabled=false\n'
+        config='config set prompt.engine '+getattr(self,'engine','native')+"\nconfig set prompt.left 'N> '\nconfig set colors.enabled false\nalias config_loaded='echo config-script-loaded'\nexport NASH_CONFIG_TEST=loaded\n"
         config+=getattr(self,'extra_config','')
-        (self.root/'nash/config.toml').write_text(config)
+        (self.root/'nash/config.nash').write_text(config)
+        # Native script wins over conflicting legacy TOML.
+        (self.root/'nash/config.toml').write_text('[prompt]\nleft="WRONG> "\n')
         if getattr(self,'engine','native')=='starship':
             fake=self.root/'starship'
             fake.write_text('#!/usr/bin/python3\nimport sys,json,os\nwith open(os.environ["NASH_PROMPT_LOG"],"a") as f: f.write(json.dumps(sys.argv[1:])+"\\n")\nprint("R" if "--right" in sys.argv else "α\\nN> ",end="")\n')
@@ -80,11 +82,14 @@ class TerminalTests(unittest.TestCase):
         f=self.root/'unique-completion';f.write_text('completed\n')
         self.command(('cat '+str(self.root)+'/unique-comp').encode()+b'\t',b'completed')
     def test_prompt_config_and_hooks(self):
+        self.command(b'config_loaded',b'config-script-loaded')
+        self.command(b'echo $NASH_CONFIG_TEST',b'loaded')
+        self.command(b'config get colors.enabled',b'false')
         self.command(b'pwd',os.getcwd().encode())
 class StarshipTerminalTests(TerminalTests):
     engine='starship'
     # Failing hooks must not overwrite the previous command's status.
-    extra_config='[hooks]\nprecmd=["false"]\n'
+    extra_config="config hook precmd 'false'\n"
     def test_starship_context_and_refresh(self):
         import json
         log=self.root/'prompt-log'

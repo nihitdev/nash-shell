@@ -2,6 +2,10 @@
 
 ## 0.2.0 — unreleased
 
+- Load config.nash as the primary shell startup file, with validated config and has builtins.
+- Add a user handbook covering configuration, aliases, Fastfetch/popular tools, keys and troubleshooting.
+- Keep legacy TOML as a fallback only when config.nash is absent.
+
 - Use Nash's own native prompt by default; enable Starship explicitly in TOML.
 
 - Establish Nash as an attributed fork of ang.sh; retain upstream history and MIT copyright.

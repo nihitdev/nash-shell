@@ -6,10 +6,11 @@
 namespace ang {
 std::string highlight_line(const std::string &line, const ShellState &st) {
     static const std::set<std::string> builtins = {
-        "cd",      "pwd",   "echo",  "exit",   "export", "unset",        "set",        "alias",
-        "unalias", "abbr",  "posix", "source", ".",      "history",      "help",       "version",
-        "true",    "false", "type",  "which",  "theme",  "env",          "printenv",   "autocd",
-        "read",    "jobs",  "fg",    "bg",     "wait",   "integrations", "nash-prompt"};
+        "cd",    "pwd",          "echo",        "exit",   "export", "unset", "set",
+        "alias", "unalias",      "abbr",        "posix",  "source", ".",     "history",
+        "help",  "version",      "true",        "false",  "type",   "which", "theme",
+        "env",   "printenv",     "autocd",      "read",   "jobs",   "fg",    "bg",
+        "wait",  "integrations", "nash-prompt", "config", "has"};
     std::string out;
     bool first = true;
     for (size_t i = 0; i < line.size();) {

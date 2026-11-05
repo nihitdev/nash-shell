@@ -163,8 +163,9 @@ static std::vector<std::string> complete(const std::string &prefix, bool first,
         directory = st.get("HOME") + directory.substr(1);
     scan(directory, base, false);
     if (first && slash == std::string::npos) {
-        for (const auto &name : {"cd", "pwd", "echo", "export", "unset", "alias", "unalias",
-                                 "source", "exit", "jobs", "fg", "bg", "wait", "history", "help"})
+        for (const auto &name :
+             {"cd", "pwd", "echo", "export", "unset", "alias", "unalias", "source", "exit", "jobs",
+              "fg", "bg", "wait", "history", "help", "config", "has"})
             if (std::string(name).starts_with(prefix))
                 matches.insert(name);
         for (const auto &[name, _] : st.aliases)

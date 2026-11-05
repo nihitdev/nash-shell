@@ -10,7 +10,7 @@ Nash retains ang.sh's small-module layout while moving runtime coordination out 
 - `executor`: prepares each command once, parent builtins, RAII descriptor/environment restoration,
   pipeline launch barrier, fork/exec, groups and wait statuses.
 - `integrations`: direct argv capture with output cap and deadline; Starship protocol; lifecycle hooks.
-- `config`: toml++ configuration, explicit startup file and session history loading.
+- `config`: command-based config.nash startup, validated config builtin, legacy TOML fallback and history loading.
 - `editor` / `highlight`: termios RAII, Unicode movement, display-cell positions, raw-input coloring,
   completion, history suggestions and search.
 - `prompt`: inherited template renderer, themes, ANSI-aware widths and native fallback.

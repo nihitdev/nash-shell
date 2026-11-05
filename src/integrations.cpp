@@ -175,8 +175,8 @@ void run_hook(const std::string &point, ShellState &st) {
     st.pipeline_status = pipeline;
 }
 int bi_integrations(const std::vector<std::string> &, ShellState &) {
-    for (const auto *tool : {"starship", "zoxide", "fzf", "atuin", "direnv", "git", "eza", "bat",
-                             "yazi", "prism", "yoo"}) {
+    for (const auto *tool : {"starship", "zoxide", "fzf", "atuin", "direnv", "git", "fastfetch",
+                             "eza", "bat", "yazi", "prism", "yoo"}) {
         auto path = find_executable(tool);
         std::cout << tool << ": " << (path ? *path : "not installed")
                   << (std::string(tool) == "starship" ? " (native prompt integration)"

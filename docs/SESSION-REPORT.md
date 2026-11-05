@@ -114,3 +114,23 @@ The new regression confirms an inherited Starship environment never activates St
 when the default native engine is selected. Explicit Starship tests continue to pass.
 A fresh PTY session verified the already installed executable displays the native prompt
 using the user's new Nash config; its existing Starship config was untouched.
+
+## config.nash and user handbook update
+
+The primary startup file is now `~/.config/nash/config.nash`, containing Nash commands.
+The validated `config set/get/hook/unhook/bind/unbind` builtin configures settings at runtime;
+`has` guards optional executables. An existing config.nash takes precedence over legacy TOML,
+which remains a fallback. A minimal user config.nash was created without deleting the old TOML.
+
+Added a handbook index plus guides for getting started, every supported setting, aliases,
+Fastfetch/popular tools, keys, and troubleshooting. Tool recipes link to primary documentation
+and distinguish direct CLI usage from native adapters. Examples are tested with isolated tools;
+the actual installed tools' help was inspected. No native Direnv/Atuin/FZF adapter is claimed.
+The handbook and examples are also included in the install rules for offline reading.
+
+Debug CTest passed all four suites in 24.72 s; ASan/UBSan CTest passed all four in 14.88 s:
+unit checks, 29 execution tests, 21 PTY tests, and 3 documentation tests. PTY tests now load
+config.nash and verify precedence, aliases, exports and hooks. Documentation tests execute the
+shipped config and Fastfetch recipes with fixtures, and validate local Markdown links.
+Release rebuilt successfully. Global reinstallation still requires the user's sudo password;
+the new executable is directly runnable at `build-release/nash` until then.

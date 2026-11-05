@@ -132,6 +132,19 @@ class ShellTests(unittest.TestCase):
             self.assertIn('nash ',result.stdout)
             self.assertIn('\n❯ ',result.stdout)
             self.assertFalse(marker.exists())
+    def test_config_commands(self):
+        self.check('config set prompt.engine starship; config get prompt.engine; config set history.limit 42; config get history.limit','starship\n42\n')
+        self.check('config set autosuggestions.enabled false; config get autosuggestions.enabled','false\n')
+        self.check('config set prompt.engine wrong; config get prompt.engine','native\n')
+        for command in ['config set unknown value','config set history.limit 0','config set prompt.timeout_ms huge','config set colors.enabled maybe','config hook wrong true','config bind Ctrl-F wrong']:
+            with self.subTest(command=command):self.assertEqual(self.run_shell(command).returncode,2)
+    def test_has_optional_tool(self):
+        self.check('has tool_that_does_not_exist_983843 && echo no; has /bin/echo && echo yes','yes\n')
+    def test_config_file_source(self):
+        with tempfile.TemporaryDirectory() as d:
+            config=pathlib.Path(d,'config.nash')
+            config.write_text("config set prompt.engine native\nalias greet='echo hello'\nexport NASH_CONFIG_MARKER=ready\n")
+            self.check(f'source {config}\ngreet\necho $NASH_CONFIG_MARKER','hello\nready\n')
     def test_empty_command(self):
         self.check('')
 if __name__=='__main__': unittest.main()
