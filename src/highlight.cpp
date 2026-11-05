@@ -1,87 +1,76 @@
-// highlight.cpp
+// Nash renderer: preserve every input byte while adding color spans.
 #include "highlight.h"
-#include "lexer.h"
+#include "integrations.h"
 #include "util.h"
-#include <cstdlib>
-#include <unistd.h>
-
+#include <set>
 namespace ang {
-
-static bool on_path(const std::string& cmd) {
-    if (cmd.find('/') != std::string::npos) return access(cmd.c_str(), X_OK) == 0;
-    const char* p = getenv("PATH");
-    std::string path = p ? p : "/bin:/usr/bin";
-    size_t a = 0;
-    while (a <= path.size()) {
-        size_t b = path.find(':', a);
-        std::string d = path.substr(a, b == std::string::npos ? b : b - a);
-        if (!d.empty() && access((d + "/" + cmd).c_str(), X_OK) == 0) return true;
-        if (b == std::string::npos) break;
-        a = b + 1;
-    }
-    return false;
-}
-
-static bool is_builtin_name(const std::string& c) {
-    for (auto b : {"cd","exit","logout","export","unset","set","alias","unalias",
-                   "abbr","posix","source",".","history","help","version","true",
-                   "false","type","which","theme","env","echo","pwd","autocd",
-                   "read","jobs","wait"})
-        if (c == b) return true;
-    return false;
-}
-
-std::string highlight_line(const std::string& line, const ShellState& st) {
-    std::string t = trim(line);
-    if (!t.empty() && t[0] == '#') return "\033[2m" + line + "\033[0m";
-    auto toks = lex(line, nullptr);
-
-    // Re-emit tokens with colors. Spacing is approximated with single gaps
-    // (display-only; the real buffer is untouched).
+std::string highlight_line(const std::string &line, const ShellState &st) {
+    static const std::set<std::string> builtins = {
+        "cd",      "pwd",   "echo",  "exit",   "export", "unset",        "set",        "alias",
+        "unalias", "abbr",  "posix", "source", ".",      "history",      "help",       "version",
+        "true",    "false", "type",  "which",  "theme",  "env",          "printenv",   "autocd",
+        "read",    "jobs",  "fg",    "bg",     "wait",   "integrations", "nash-prompt"};
     std::string out;
-    bool first_word = true;
-    for (size_t k = 0; k < toks.size(); ++k) {
-        if (k) out += " ";
-        const auto& tk = toks[k];
-        if (tk.kind == TokKind::Word) {
-            // alias/abbr resolve for color purposes
-            std::string w = tk.text;
-            auto al = st.aliases.find(w);
-            if (first_word && al != st.aliases.end()) w = split_words(al->second).front();
-            auto ab = st.abbrs.find(tk.text);
-            if (first_word && ab != st.abbrs.end()) w = split_words(ab->second).front();
-            if (first_word && (tk.text.find('=') == std::string::npos)) {
-                bool ok = is_builtin_name(w) || on_path(w);
-                out += ok ? "\033[1;32m" + tk.text + "\033[0m"
-                          : "\033[1;31m" + tk.text + "\033[0m";
-                first_word = false;
-            } else if (tk.quote_kind != QuoteKind::None) {
-                out += "\033[33m" + tk.text + "\033[0m";
-            } else if (!tk.text.empty() && tk.text[0] == '-') {
-                out += "\033[96m" + tk.text + "\033[0m";
-            } else if (!tk.text.empty() && tk.text[0] == '$') {
-                out += "\033[35m" + tk.text + "\033[0m";
-            } else {
-                out += tk.text;
-            }
-        } else {
-            out += "\033[36m" + tk.text + "\033[0m";
-            if (tk.kind == TokKind::Semi || tk.kind == TokKind::And ||
-                tk.kind == TokKind::Or || tk.kind == TokKind::Bg)
-                first_word = true;
+    bool first = true;
+    for (size_t i = 0; i < line.size();) {
+        char c = line[i];
+        if (c == ' ' || c == '\t' || c == '\n') {
+            out += c;
+            ++i;
+            continue;
         }
-        if (tk.kind == TokKind::Pipe) first_word = true;
+        if (c == '#') {
+            out += "\033[2m" + line.substr(i) + "\033[0m";
+            break;
+        }
+        if (c == '\'' || c == '"') {
+            char q = c;
+            size_t begin = i++;
+            while (i < line.size()) {
+                if (line[i] == '\\' && q == '"' && i + 1 < line.size())
+                    i += 2;
+                else if (line[i++] == q)
+                    break;
+            }
+            out += "\033[33m" + line.substr(begin, i - begin) + "\033[0m";
+            first = false;
+            continue;
+        }
+        if (std::string("|&;<>").find(c) != std::string::npos) {
+            out += "\033[36m" + std::string(1, c) + "\033[0m";
+            ++i;
+            if (c == '|' || c == '&' || c == ';')
+                first = true;
+            continue;
+        }
+        size_t begin = i;
+        while (i < line.size() && std::string(" \t\n'\"|&;<>").find(line[i]) == std::string::npos) {
+            if (line[i] == '\\' && i + 1 < line.size())
+                i += 2;
+            else
+                ++i;
+        }
+        auto word = line.substr(begin, i - begin);
+        std::string color;
+        if (first && !is_assign_word(word)) {
+            bool valid = builtins.contains(word) || st.aliases.contains(word) ||
+                         st.abbrs.contains(word) || find_executable(word).has_value();
+            color = valid ? "\033[32m" : "\033[31m";
+            first = false;
+        } else if (word.starts_with('$'))
+            color = "\033[35m";
+        else if (word.starts_with('-'))
+            color = "\033[96m";
+        out += color + word + (color.empty() ? "" : "\033[0m");
     }
     return out;
 }
-
-std::string autosuggest(const std::string& line, const ShellState& st) {
-    if (line.empty()) return "";
-    for (auto it = st.history.rbegin(); it != st.history.rend(); ++it) {
-        if (it->size() > line.size() && it->compare(0, line.size(), line) == 0)
-            return it->substr(line.size());
-    }
-    return "";
+std::string autosuggest(const std::string &line, const ShellState &st) {
+    if (!st.suggestions_enabled || line.empty())
+        return {};
+    for (auto i = st.history.rbegin(); i != st.history.rend(); ++i)
+        if (i->size() > line.size() && i->starts_with(line))
+            return i->substr(line.size());
+    return {};
 }
-
-}  // namespace ang
+} // namespace ang

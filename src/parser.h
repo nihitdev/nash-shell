@@ -10,16 +10,17 @@
 // rejects it in Ang mode at run time. Deferred rejection means
 // `posix on; FOO=bar` works left-to-right in one line, matching user intent.
 #pragma once
+#include "lexer.h"
+#include "util.h"
 #include <string>
 #include <vector>
-#include "util.h"
-#include "lexer.h"
 
 namespace ang {
 
 struct Redir {
     std::string op;     // "<", ">", ">>", "2>", "2>>", "&>", "&>>"
     std::string target; // filename
+    QuoteSpec quoted;
 };
 
 struct SimpleCmd {
@@ -43,7 +44,6 @@ struct JobList {
     std::vector<AndOr> items;
 };
 
-bool parse(const std::vector<Token>& toks, bool posix_mode, JobList* out,
-           std::string* err);
+bool parse(const std::vector<Token> &toks, bool posix_mode, JobList *out, std::string *err);
 
-}  // namespace ang
+} // namespace ang

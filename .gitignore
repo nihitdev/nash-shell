@@ -1,3 +1,6 @@
-build/
-compile_commands.json
-build-asan/
+/build*/
+/compile_commands.json
+*.pkg.tar.*
+*.tar.gz
+.cache/
+__pycache__/

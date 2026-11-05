@@ -1,96 +1,84 @@
-// config.cpp
 #include "config.h"
-#include "builtins.h"
-#include "executor.h"
-#include "lexer.h"
-#include "parser.h"
 #include "prompt.h"
+#include "shell.h"
 #include "util.h"
-#include <algorithm>
-#include <cstdlib>
 #include <filesystem>
 #include <fstream>
-#include <vector>
-
+#include <iostream>
+#include <sstream>
+#include <toml++/toml.hpp>
 namespace ang {
-
-void apply_defaults(ShellState& st) {
-    st.prompt_left = "{gray}{user}@{host}{reset} {bold}{blue}{cwd}{reset}{purple}{branch}{reset} {arrow} ";
-    st.prompt_right = "{dim}{mode}{time}{reset}";
+void apply_defaults(ShellState &st) {
+    st.prompt_left = "{blue}{cwd}{reset} {fail}{arrow} ";
+    st.prompt_right.clear();
     st.history_file = data_dir() + "/history";
 }
-
-static void run_quiet(const std::string& line, ShellState& st) {
-    bool skip = false;
-    // Never let user config see interactive-only expansions as fatal.
-    bool was = st.interactive;
-    st.interactive = false;
-    std::string s = preprocess(line, st, &skip);
-    st.interactive = was;
-    if (skip) return;
-    auto toks = lex(s, nullptr);
-    if (toks.empty()) return;
-    // Autocd / partial lines in config: ignore errors silently.
-    if (toks.size() == 1 && toks[0].kind == TokKind::Word) {
-        std::string w = expand_tilde(toks[0].text);
-        std::error_code ec;
-        if (std::filesystem::is_directory(w, ec)) return;
-    }
-    JobList jobs;
-    std::string err;
-    if (!parse(toks, st.posix, &jobs, &err)) return;
-    run_jobs(jobs, st);
-}
-
-void load_config(ShellState& st) {
-    apply_defaults(st);
-
-    // Theme first (config can override with `theme x`).
-    std::string err;
-    load_theme("default", st, nullptr);
-    std::ifstream tc(config_dir() + "/theme.conf");
-    if (tc) load_theme(config_dir() + "/theme.conf", st, nullptr);
-    (void)err;
-
-    // Main config: plain nash commands.
-    std::ifstream cfg(config_dir() + "/config.ang");
-    std::string line;
-    if (cfg) {
-        while (std::getline(cfg, line)) {
-            run_quiet(line, st);
-            if (g_should_exit) { g_should_exit = false; break; }
+void load_config(ShellState &st) {
+    auto path = config_dir() + "/config.toml";
+    if (std::filesystem::exists(path)) {
+        try {
+            auto t = toml::parse_file(path);
+            st.prompt_engine = t["prompt"]["engine"].value_or(st.prompt_engine);
+            if (st.prompt_engine != "starship" && st.prompt_engine != "native") {
+                std::cerr << "nash: prompt.engine must be starship or native; using native\n";
+                st.prompt_engine = "native";
+            }
+            auto timeout = t["prompt"]["timeout_ms"].value_or<int64_t>(1500);
+            if (timeout < 50 || timeout > 10000)
+                throw std::runtime_error("prompt.timeout_ms must be 50..10000");
+            st.prompt_timeout_ms = static_cast<int>(timeout);
+            if (auto theme = t["prompt"]["theme"].value<std::string>()) {
+                std::string error;
+                if (!load_theme(*theme, st, &error))
+                    std::cerr << "nash: " << error << '\n';
+            }
+            st.prompt_left = t["prompt"]["left"].value_or(st.prompt_left);
+            st.prompt_right = t["prompt"]["right"].value_or(st.prompt_right);
+            st.suggestions_enabled = t["autosuggestions"]["enabled"].value_or(true);
+            st.highlighting_enabled = t["highlighting"]["enabled"].value_or(true);
+            st.completion_enabled = t["completion"]["enabled"].value_or(true);
+            st.colors_enabled = t["colors"]["enabled"].value_or(true);
+            st.history_enabled = t["history"]["enabled"].value_or(true);
+            st.history_file = expand_tilde(t["history"]["path"].value_or(st.history_file));
+            auto limit = t["history"]["limit"].value_or<int64_t>(5000);
+            if (limit < 1 || limit > 1000000)
+                throw std::runtime_error("history.limit must be 1..1000000");
+            st.history_limit = static_cast<size_t>(limit);
+            st.autocd = t["editor"]["autocd"].value_or(false);
+            if (auto keys = t["keybindings"].as_table())
+                for (const auto &[key, val] : *keys)
+                    if (auto v = val.value<std::string>())
+                        st.keybindings[std::string(key.str())] = *v;
+            for (const auto *point : {"precmd", "preexec", "chpwd"})
+                if (auto commands = t["hooks"][point].as_array())
+                    for (const auto &val : *commands)
+                        if (auto v = val.value<std::string>())
+                            st.hooks[point].push_back(*v);
+            st.startup_file = expand_tilde(t["startup"]["file"].value_or(std::string{}));
+        } catch (const std::exception &e) {
+            std::cerr << "nash: " << path << ": " << e.what() << '\n';
         }
     }
-    // Plugins: each *.ang sourced in sorted order.
-    std::error_code ec;
-    std::string plugdir = config_dir() + "/plugins";
-    if (std::filesystem::is_directory(plugdir, ec)) {
-        std::vector<std::string> files;
-        for (auto& e : std::filesystem::directory_iterator(plugdir, ec)) {
-            if (e.path().extension() == ".ang") files.push_back(e.path().string());
-        }
-        std::sort(files.begin(), files.end());
-        for (auto& f : files) {
-            std::vector<std::string> args = {"source", f};
-            bi_source(args, st);
-            if (g_should_exit) { g_should_exit = false; break; }
+    if (!st.startup_file.empty()) {
+        std::ifstream f(st.startup_file);
+        if (!f)
+            std::cerr << "nash: cannot read startup file " << st.startup_file << '\n';
+        else {
+            std::ostringstream s;
+            s << f.rdbuf();
+            run_source(s.str(), st);
         }
     }
-
-    // Env override wins for scripting: NASH_POSIX=1 nash
-    if (const char* p = getenv("NASH_POSIX"))
-        if (std::string(p) == "1" || std::string(p) == "on") st.posix = true;
-
-    // Load history
-    std::ifstream h(st.history_file);
-    if (h) {
-        while (std::getline(h, line)) {
-            if (!line.empty()) st.history.push_back(line);
-        }
-        if (st.history.size() > 10000)
+    if (st.history_enabled) {
+        std::ifstream f(st.history_file);
+        std::string line;
+        while (std::getline(f, line))
+            if (!line.empty())
+                st.history.push_back(line);
+        if (st.history.size() > st.history_limit)
             st.history.erase(st.history.begin(),
-                             st.history.end() - 10000);
+                             st.history.end() - static_cast<std::ptrdiff_t>(st.history_limit));
+        st.history_saved = st.history.size();
     }
 }
-
-}  // namespace ang
+} // namespace ang

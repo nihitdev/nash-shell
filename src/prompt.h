@@ -18,19 +18,19 @@
 // Example: "{gray}{user}@{host}{reset} {bold}{blue}{cwd}{reset}{purple}{branch}{reset} {arrow} "
 // Ricing = editing themes/<name>.conf or ~/.config/nash/theme.conf.
 #pragma once
-#include <string>
 #include "env.h"
+#include <string>
 
 namespace ang {
 
 // Expand a prompt template into ANSI-colored text.
-std::string render_prompt(const std::string& tmpl, const ShellState& st);
+std::string render_prompt(const std::string &tmpl, const ShellState &st);
 
 // Load themes/<name>.conf or a direct path into st.prompt_left/right.
-bool load_theme(const std::string& name_or_path, ShellState& st,
-                std::string* err = nullptr);
+bool load_theme(const std::string &name_or_path, ShellState &st, std::string *err = nullptr);
 
 // Visible length: ANSI escapes and UTF-8 continuation bytes don't count.
-size_t visible_len(const std::string& s);
+size_t visible_len(const std::string &s);
+std::string make_prompt(const ShellState &st, bool right);
 
-}  // namespace ang
+} // namespace ang

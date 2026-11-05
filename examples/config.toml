@@ -1,0 +1,34 @@
+# ~/.config/nash/config.toml
+[prompt]
+engine = "starship"
+fallback = "native"
+timeout_ms = 1500
+# theme = "minimal" # used by native prompt; installed themes available after installation
+
+[colors]
+enabled = true
+[autosuggestions]
+enabled = true
+[highlighting]
+enabled = true
+[completion]
+enabled = true
+[history]
+enabled = true
+limit = 5000
+# path = "~/.local/share/nash/history"
+[editor]
+autocd = false
+[startup]
+# file = "~/.config/nash/init.nash"
+
+# Commands in these arrays run in Nash syntax, not Bash/Fish initialization syntax.
+[hooks]
+precmd = []
+preexec = []
+chpwd = []
+
+# Bind raw terminal sequences to supported editing actions.
+[keybindings]
+"\u0006" = "accept-suggestion"
+"\u0012" = "history-search"

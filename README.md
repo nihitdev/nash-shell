@@ -1,218 +1,125 @@
-# ang.sh — angsh
+# Nash Shell
 
-<p align="center">
-  <a href="https://github.com/0x251C08/ang.sh/actions/workflows/ci.yml"><img src="https://github.com/0x251C08/ang.sh/actions/workflows/ci.yml/badge.svg" alt="ci"></a>
-  <img src="https://img.shields.io/badge/version-0.1.3-blueviolet?style=flat-square" alt="version">
-  <img src="https://img.shields.io/badge/language-C%2B%2B17-00599C?style=flat-square" alt="C++17">
-  <img src="https://img.shields.io/badge/dependencies-none-brightgreen?style=flat-square" alt="no deps">
-  <img src="https://img.shields.io/badge/license-MIT-yellow?style=flat-square" alt="MIT">
-  <img src="https://img.shields.io/badge/platform-linux%20%7C%20macOS-lightgrey?style=flat-square" alt="platform">
-</p>
+A customizable C++23 Unix shell, maintained by **nihitdev**, with native Starship prompts.
+Executable: `nash`. Linux is the initial tested platform. This is early development software,
+not a production-ready or POSIX-certified shell.
 
-```
-  __ _ _ __   __ _ ___| |__
- / _` | '_ \ / _` / __| '_ \
-| (_| | | | | (_| \__ \ | | |
- \__,_|_| |_|\__, |___/_| |_|
-              |___/  v0.1.3
-```
+Nash is a **fork of [ang.sh](https://github.com/0x251C08/ang.sh)** by 0x251C08,
+based on commit `fa22add8d9bdf7dd9fec9b29bbc4fb73a76764e7`. Its lexer/parser interfaces,
+builtin commands, execution model, native prompt templates and utilities derive from that project.
+Nash retains upstream history and MIT copyright. The `ang` internal namespace is retained to make
+this lineage clear. See [attribution](docs/ATTRIBUTION.md) for the changes made in this fork.
 
-A small Unix shell in C++ that takes the best ideas from **bash**, **zsh**, and
-**fish** — with two syntax modes, **Ang** (modern, default) and **POSIX**
-(compatible) — and builds them into something you can live in and style.
+## Build and run
 
-## ✨ The look
-
-```
-✦ armaans@0x  ~/Code/ang.sh  ⎇ main  ❯                               21:18 ✓
-```
-
-That's the `rice` theme. `default`, `minimal`, `power`, and `mono` also ship.
-The prompt renderer understands:
-
-| Kind            | Placeholders                                                                                                    |
-| --------------- | --------------------------------------------------------------------------------------------------------------- |
-| **segments**    | `{user}` `{host}` `{cwd}` `{base}` `{status}` `{char}` `{git}` `{branch}` `{mode}` `{time}`                     |
-| **status art**  | `{ok}` ✓ / `{fail}` ✗ code / `{arrow}` ❯ that turns red on failure                                              |
-| **color**       | `{red}`…`{white}`, `{br_red}`…`{br_white}`, 256-color `{orange}` `{purple}` `{pink}` `{gray}` `{teal}` `{lime}` |
-| **backgrounds** | `{on_black}` `{on_red}` `{on_green}` `{on_yellow}` `{on_blue}` `{on_magenta}` `{on_cyan}` `{on_white}`          |
-| **style**       | `{dim}` `{bold}` `{reset}`                                                                                      |
-
-**Theme gallery**
-
-| Theme     | Looks like                                           | Notes                                     |
-| --------- | ---------------------------------------------------- | ----------------------------------------- |
-| `default` | `armaans@0x ~/Code/ang.sh ⎇ main ❯` … `21:18`        | balanced, 256-color accents               |
-| `minimal` | `~/Code ❯` … `✗ 1`                                   | status only when it matters               |
-| `rice`    | `✦ armaans@0x  ~/Code/ang.sh  ⎇ main  ❯` … `21:18 ✓` | maximum shimmer, no fonts needed          |
-| `power`   | `▊ armaans@0x ▸ ang.sh ❯`                            | powerline segments — needs a Nerd Font    |
-| `mono`    | `armaans@0x ~/Code/ang.sh $`                         | zero color: logs, dumb terminals, purists |
+Requirements: a C++23 compiler, CMake >= 3.20, toml++ >= 3, and Python 3 for tests.
+Starship and all other external tools are optional. No daemon, account, or telemetry.
 
 ```sh
-theme rice     # switch live, or set it in ~/.config/angsh/config.ang
+# Debian / Ubuntu
+sudo apt install build-essential cmake libtomlplusplus-dev python3
+# Arch Linux
+sudo pacman -S base-devel cmake tomlplusplus python
+
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+./build/nash
+./build/nash --no-config -c 'X=hello; echo "$X" | tr a-z A-Z'
 ```
 
-## 🍬 What it borrowed
-
-| Feature                                                          | From       | Shipped in |
-| ---------------------------------------------------------------- | ---------- | ---------- |
-| pipes, `>`, `>>`, `<`, `2>`, `2>>`, `&>`, `2>&1`, `&&`, `\|\|`, `;`, `&` | bash/POSIX | v0.1.0 |
-| `$VAR`, `${VAR}`, `$?`, `$$`, `$!`, `~`, glob `* ? []`           | bash       | v0.1.0 |
-| history file, `!!` / `!$`, `alias`, `type`, `which`              | bash       | v0.1.0 |
-| left/right prompt themes, `autocd`, plugin dir                   | zsh        | v0.1.0 |
-| ghost autosuggestions, inline highlighting, `abbr`, `set` syntax | fish       | v0.1.0 |
-| `$(...)` command substitution                                    | bash/zsh   | v0.1.2 |
-| `read [-p PROMPT] NAME...`, `&` background jobs + `jobs`         | bash/fish  | v0.1.2 |
-| backslash escapes (`\$`, `\*`, `\n`), `wait`, `echo -e`, per-command `alias` | bash | v0.1.3 |
-| `if`/`for`/`while`, functions                                    | —          | ⏳ v0.2   |
-
-The interactive niceties are all there out of the box:
-
-- **Ghost suggestions** — type `g`, see the rest of the last `git …` command in
-  dim text, hit `→` or `Ctrl-F` to accept.
-- **Inline highlighting** — commands are green when found, red when missing,
-  strings yellow, flags cyan.
-- **A welcome you'll actually look at** — the banner greets you with mode,
-  version, and active theme.
-
-## 🔀 Two syntaxes
-
-Default is **Ang**. Pass `--posix` (or `ANG_POSIX=1`) for POSIX mode.
-
-| Task                 | Ang (default)            | POSIX (`posix on`)             |
-| -------------------- | ------------------------ | ------------------------------ |
-| set a variable       | `set FOO bar baz`        | `export FOO="bar baz"`         |
-| temp env for one cmd | use `export`             | `FOO=bar cmd`                  |
-| read a variable      | `$FOO` (both)            | `$FOO`                         |
-| toggle mode          | `posix on` / `posix off` | same                           |
-| script shebang       | `#!/usr/bin/env angsh`   | `#!/usr/bin/env angsh --posix` |
-
-In Ang mode, a bare `FOO=bar` gets a friendly red hint instead of silently
-guessing what you meant:
-
-```
-angsh: assignment 'FOO=bar' needs POSIX mode (try `set FOO bar` or `posix on`)
-```
-
-## 📦 Install
-
-**One-liner** — resolves the latest release, verifies the checksum, and installs
-the static binary (`/usr/local/bin` if writable, else `~/.local/bin`):
+Install without changing your login shell:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/0x251C08/ang.sh/main/install.sh | sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$HOME/.local"
+cmake --build build --parallel
+cmake --install build
 ```
 
-Pin a version or pick a directory:
+## Starship: keep your existing prompt
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/0x251C08/ang.sh/main/install.sh | sh -s -- --version v0.1.3 --dir ~/bin
+Nash automatically uses `starship` from PATH. Starship itself reads your existing
+`~/.config/starship.toml`, or `STARSHIP_CONFIG` when set. No conversion, duplicated prompt,
+Bash init script, or hardcoded Nerd Font symbols are required.
+
+Create `$XDG_CONFIG_HOME/nash/config.toml` (default `~/.config/nash/config.toml`):
+
+```toml
+[prompt]
+engine = "starship"
+fallback = "native"
+timeout_ms = 1500
 ```
 
-**Manual download** — Linux x86_64, fully static (no runtime dependencies):
+Nash passes last status, per-stage pipeline statuses, command duration in milliseconds,
+physical and logical working directories, terminal width, and active job count to
+`starship prompt`. It sets `STARSHIP_SHELL=nash` and a session key. Git modules run through
+Starship itself. ANSI, Unicode, and multiline left prompts are preserved. `--right` output
+is shown on the input row when it is a single line and fits without overlapping input.
+The prompt is generated once per input, not per keystroke. Missing, failing, or timed-out
+Starship processes fall back to the native prompt; a missing right prompt simply disappears.
 
-```sh
-curl -LO https://github.com/0x251C08/ang.sh/releases/download/v0.1.3/angsh-v0.1.3-x86_64-linux
-curl -LO https://github.com/0x251C08/ang.sh/releases/download/v0.1.3/angsh-v0.1.3-x86_64-linux.sha256
-sha256sum -c angsh-v0.1.3-x86_64-linux.sha256
-chmod +x angsh-v0.1.3-x86_64-linux
-sudo mv angsh-v0.1.3-x86_64-linux /usr/local/bin/angsh
-```
+Starship does not recognize Nash as a named shell in every module. In particular, shell-specific
+`[shell]` display settings and `[custom.*]` commands may need an explicit supported interpreter
+in Starship's own configuration. Nash never executes Starship's output as shell code.
+See [Starship's shell-agnostic integration guidance](https://starship.rs/faq/).
 
-**From source** — any POSIX system with a C++17+ compiler and CMake 3.16+:
+## Working features
 
-```sh
-cmake -B build && cmake --build build   # optimized (Release) by default
-./build/angsh
-sudo cmake --install build              # /usr/local/bin + themes
-```
+- External commands, pipelines, `&&`, `||`, `;`, background jobs and exit statuses.
+- Input/output/append/stderr redirection, `&>`, `2>&1`, `>&2`.
+- Variables, command-local assignments, `$?`, `$$`, `$!`, quoting, escapes,
+  `$(...)`, `${NAME:-fallback}`, tilde and filename expansion.
+- `cd`, `pwd`, `export`, `unset`, `set`, aliases, abbreviations, `source`, `read`,
+  history, `jobs`, `fg`, `bg`, and `wait`; run `help` for more.
+- Foreground process groups, terminal handoff, Ctrl-C, Ctrl-Z, and resume.
+- Syntax and command validation coloring, history ghost suggestions, path/executable Tab
+  completion, Ctrl-R substring history search, Up/Down, Emacs editing keys, UTF-8 codepoint
+  cursor movement, continuation input and bracketed paste.
+- TOML settings, native theme templates, explicit `precmd`, `preexec`, and `chpwd` hooks.
 
-Use `-DCMAKE_BUILD_TYPE=Debug` for a debug build. **Zero libraries** — stdlib
-and POSIX only, by design.
+POSIX-like assignment syntax is the default. `--ang` keeps the inherited `set NAME value`
+mode; `--posix` selects assignments again. Configuration is loaded only in interactive mode;
+`--no-config` disables it. Startup shell commands must be explicitly configured with
+`[startup].file`; legacy `config.ang` and automatic plugin directory loading are not used.
 
-## 🚀 Usage
+Aliases are expanded before parsing a logical command, as in the inherited implementation:
+define an alias on an earlier line before using it. Leading-space commands are omitted from
+history. Concurrent history sessions append under a file lock. The history limit bounds
+session memory; disk history is append-only and multiline records remain session-only.
 
-```sh
-angsh                    # interactive (Ang mode)
-angsh --posix            # interactive (POSIX mode)
-angsh -c 'echo hi | tr a-z A-Z'
-angsh script.ang         # run a script
-```
+## Customization and tools
 
-## 🎨 Ricing
+See [examples/config.toml](examples/config.toml). Set `engine = "native"` and choose a
+`theme` after installation. Shipped templates: minimal, classic, modern, catppuccin,
+rose-pine, tokyo-night, gruvbox, nord, dracula, monochrome, plus inherited themes.
+Native templates accept ANSI palette names and true-color `{#RRGGBB}` spans. `NO_COLOR` and `TERM=dumb` disable native and editor colors. Starship controls its own colors.
 
-Every file below is either plain angsh commands or `key="value"` lines — no new
-config language to learn:
+Keybindings map raw terminal sequences to `accept-suggestion`, `history-search`,
+`beginning-of-line`, or `end-of-line`. Ctrl-R searches by substring; fuzzy search is planned.
+Alt-Enter inserts a newline. Pasted newlines are buffered until Enter is pressed.
 
-```sh
-~/.config/angsh/config.ang      # plain commands (see examples/config.ang)
-~/.config/angsh/theme.conf      # prompt_left / prompt_right
-~/.config/angsh/themes/*.conf   # your own themes
-~/.config/angsh/plugins/*.ang   # sourced alphabetically at startup
-```
+The `integrations` builtin reports availability of Starship, Zoxide, FZF, Atuin, Direnv,
+Git, Eza, Bat, Yazi, Prism and yoo. **Only Starship has a native adapter.** The rest remain
+ordinary optional external commands. Hooks accept Nash commands; do not source Bash/Fish
+initialization scripts into Nash. See [integrations](docs/INTEGRATIONS.md).
 
-A theme is three lines of honesty:
+## Known limits and next work
 
-```ini
-prompt_left="{orange}{user}{reset}{gray}@{reset}{teal}{host}{reset} {bold}{cwd}{reset}{purple}{branch}{reset} {arrow} "
-prompt_right="{gray}{mode}{time}{fail}{reset}"
-```
+This is not a complete POSIX shell. Functions, `if`, loops, `case`, subshell syntax,
+here-documents, arithmetic/process substitution, arrays, traps, full parameter operators,
+positional script arguments, asynchronous whole `&&`/`||` lists, and `set -e` / pipefail are not implemented. Unsupported reserved
+syntax is rejected. Do not use Nash to run arbitrary existing Bash/POSIX scripts.
 
-Interactive keys: `Tab` complete · `→`/`Ctrl-F` accept suggestion · `↑`/`↓`
-history · `Ctrl-A/E/U/K/W` edit · `Ctrl-C` cancel · `Ctrl-D` exit.
+Cursor movement is by codepoint, not Unicode grapheme cluster. Widths follow system
+`wcwidth`; unusual emoji sequences and terminal-specific glyph widths can differ.
+No native fuzzy/Git completion, Atuin history, Direnv export import, or plugin ABI yet.
+Right prompts do not support multiple lines. Job control needs broader stress testing
+before this should become a login shell. macOS and other POSIX systems remain planned.
 
-> Note: `alias`/`abbr` expand once per input _line_ (same as bash). In
-> `angsh -c '...'` strings, put aliased commands on separate lines
-> (`-c $'alias ll=... \nll'`) or prefer scripts, where each line expands.
+See [architecture](docs/ARCHITECTURE.md), [testing](docs/TESTING.md),
+[benchmarks](docs/BENCHMARKS.md), [contributing](CONTRIBUTING.md), and [changelog](CHANGELOG.md).
 
-## 🧑‍💻 For developers
+## License
 
-```
-src/
-  main.cpp      CLI + REPL loop (~150 lines)
-  lexer.cpp     tokenizer          parser.cpp   && || | ; & grammar
-  expand.cpp    $VAR ~ glob        executor.cpp fork/pipe/redirect runner
-  builtins.cpp  18 builtins        prompt.cpp   theme rendering
-  config.cpp    config+plugins     editor.cpp   raw-mode line editor
-  highlight.cpp colors+suggest     env/util     state + helpers
-```
-
-Add a builtin in 3 steps (documented in `src/builtins.h`): declare → define →
-register in `is_parent_builtin`/`run_builtin`.
-
-Colors respect `NO_COLOR` and `TERM=dumb`, so piped output and CI logs stay
-clean; `visible_len()` skips ANSI escapes and UTF-8 continuation bytes so right
-prompts stay pixel-aligned. More support for `dumb` terminal compatibility may
-come in the future and may also be a mode later on.
-
-## 🗺️ Roadmap
-
-- **v0.2** — `if`/`for`/`while` blocks (both syntaxes), functions, arithmetic
-  `$((...))`, completion scripts
-- **v0.3** — vi mode, async prompt, `~/.config/angsh/completions/`
-- **v1.0** — POSIX test-suite parity for the `--posix` subset
-
-## 📝 What's new
-
-**v0.1.3** fixes shell semantics across the board:
-
-- backslash escapes work like bash: `echo \$HOME` is literal, `echo \*`
-  doesn't glob, `"\n"` survives inside double quotes
-- unquoted substitution that yields nothing drops out of the arg list
-  (`$(true) cmd` no longer 能 spawn) — while `""` still counts as a real arg
-- `2>&1`, `>&2` and `>log 2>&1` ordering now respected
-- builtins keep their effects when redirected (`posix on >/dev/null`,
-  `history >h.txt`, `read x <answers.txt`)
-- `read` takes several names (`read a b` splits words, last gets the rest)
-  and prints its `-p` prompt on stderr like bash
-- `wait` joins every background job; `echo -e|-en` expands escapes
-- aliases/abbreviations now expand for every command in a line (`a; b; c`),
-  and `alias gh hub; gh` behaves like bash (takes effect next line)
-- tab completion and syntax highlighting know `read`, `jobs` and `wait`
-
-**v0.1.2** added command substitution `$(...)`, `read`, and background jobs
-with `[bg]`/`[done]` notifications and a `jobs` builtin.
-
-## 📄 License
-
-[MIT](LICENSE) — do what you want, just keep the notice.
+MIT. Copyright 2026 0x251C08 and nihitdev. See [LICENSE](LICENSE).

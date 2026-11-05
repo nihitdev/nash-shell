@@ -1,132 +1,190 @@
-// lexer.cpp
+// Derived lexer interface from ang.sh; Nash preserves raw quote segments.
 #include "lexer.h"
-
+#include <functional>
+#include <stdexcept>
 namespace ang {
-
-std::vector<Token> lex(const std::string& line, std::string* err) {
+std::vector<Token> lex(const std::string &s, std::string *error) {
+    if (error)
+        error->clear();
     std::vector<Token> out;
-    size_t i = 0, n = line.size();
-    auto push = [&](TokKind k, const std::string& t) {
-        Token tok; tok.kind = k; tok.text = t; out.push_back(tok);
+    size_t i = 0;
+    auto push = [&](TokKind k, const std::string &text) {
+        Token t;
+        t.kind = k;
+        t.text = text;
+        out.push_back(t);
     };
-    while (i < n) {
-        char c = line[i];
-        if (c == ' ' || c == '\t' || c == '\r') { ++i; continue; }
-        if (c == '\n') { push(TokKind::Semi, ";"); ++i; continue; }
-        if (c == '#') break;  // comment to end of line
-        if (c == ';') { push(TokKind::Semi, ";"); ++i; continue; }
-        if (c == '|') {
-            if (i + 1 < n && line[i + 1] == '|') { push(TokKind::Or, "||"); i += 2; }
-            else { push(TokKind::Pipe, "|"); ++i; }
-            continue;
-        }
-        if (c == '&') {
-            if (i + 1 < n && line[i + 1] == '>') {
-                if (i + 2 < n && line[i + 2] == '>') { push(TokKind::RedirBothAppend, "&>>"); i += 3; }
-                else { push(TokKind::RedirBoth, "&>"); i += 2; }
-            } else if (i + 1 < n && line[i + 1] == '&') { push(TokKind::And, "&&"); i += 2; }
-            else { push(TokKind::Bg, "&"); ++i; }
-            continue;
-        }
-        if (c == '<') { push(TokKind::RedirIn, "<"); ++i; continue; }
-        if (c == '>') {
-            if (i + 1 < n && line[i + 1] == '>') { push(TokKind::RedirAppend, ">>"); i += 2; }
-            else { push(TokKind::RedirOut, ">"); ++i; }
-            // >&2 — stdout dup'd to stderr (POSIX), handled as op + target
-            if (i < n && line[i] == '&' && i + 1 < n && line[i + 1] == '2') {
-                push(TokKind::Word, "&2"); i += 2;
-            }
-            continue;
-        }
-        if (c == '2' && i + 1 < n && line[i + 1] == '>') {
-            if (i + 2 < n && line[i + 2] == '>') { push(TokKind::RedirErrAppend, "2>>"); i += 3; }
-            else { push(TokKind::RedirErr, "2>"); i += 2; }
-            // 2>&1 — stderr dup'd to stdout (POSIX), handled as op + target
-            if (i < n && line[i] == '&' && i + 1 < n && line[i + 1] == '1') {
-                push(TokKind::Word, "&1"); i += 2;
-            }
-            continue;
-        }
-        // Word (with quoting)
-        std::string w;
-        QuoteKind qk = QuoteKind::None;
-        bool in_single = false, in_double = false;
-        bool any = false;
-        bool saw_quote = false;   // literal quote chars appeared in this word
-        while (i < n) {
-            char d = line[i];
-            if (in_single) {
-                if (d == '\'') { in_single = false; ++i; }
-                else { w += d; ++i; }
+    std::function<void(char)> quoted;
+    std::function<void()> substitution;
+    auto escaped = [&] {
+        if (i + 1 >= s.size())
+            throw std::runtime_error("trailing escape");
+        i += 2;
+    };
+    substitution = [&] {
+        i += 2;
+        int depth = 1;
+        while (i < s.size()) {
+            if (s[i] == '\\') {
+                escaped();
                 continue;
             }
-            if (in_double) {
-                if (d == '"') { in_double = false; ++i; }
-                // keep escape pairs intact; expansion decodes \$ \" \\ \` only
-                else if (d == '\\' && i + 1 < n &&
-                         (line[i + 1] == '$' || line[i + 1] == '"' ||
-                          line[i + 1] == '\\' || line[i + 1] == '`')) {
-                    w += '\\'; w += line[i + 1]; i += 2;
-                } else { w += d; ++i; }
+            if (s[i] == '\'' || s[i] == '"') {
+                char q = s[i];
+                quoted(q);
                 continue;
             }
-            if (d == '\'') { in_single = true; qk = QuoteKind::Single; saw_quote = true; ++i; any = true; continue; }
-            if (d == '"') { in_double = true; qk = QuoteKind::Double; saw_quote = true; ++i; any = true; continue; }
-            // keep escape pairs so expansion can protect the char (e.g. \$, \*);
-            // quote kind stays None — decoding happens in expansion, and glob
-            // is skipped via raw_has_glob() on escaped glob characters
-            if (d == '\\' && i + 1 < n) { w += '\\'; w += line[i + 1]; i += 2; any = true; continue; }
-            if (!in_single && d == '$' && i + 1 < n && line[i + 1] == '(') {
-                // command substitution $(...): scan to matching ')', quote-aware
-                size_t depth = 1, j = i + 2;
-                bool sq = false, dq = false;
-                while (j < n && depth > 0) {
-                    char c = line[j];
-                    if (sq) { if (c == '\'') sq = false; }
-                    else if (dq) {
-                        if (c == '"') dq = false;
-                        else if (c == '\\' && j + 1 < n) ++j;
-                    } else {
-                        if (c == '\'') sq = true;
-                        else if (c == '"') dq = true;
-                        else if (c == '(') ++depth;
-                        else if (c == ')') --depth;
-                    }
-                    ++j;
+            if (s[i] == '$' && i + 1 < s.size() && s[i + 1] == '(') {
+                substitution();
+                continue;
+            }
+            if (s[i] == '(')
+                ++depth;
+            if (s[i] == ')' && --depth == 0) {
+                ++i;
+                return;
+            }
+            ++i;
+        }
+        throw std::runtime_error("unterminated command substitution");
+    };
+    quoted = [&](char q) {
+        ++i;
+        while (i < s.size()) {
+            if (s[i] == q) {
+                ++i;
+                return;
+            }
+            if (q == '"' && s[i] == '\\') {
+                escaped();
+                continue;
+            }
+            if (q == '"' && s[i] == '$' && i + 1 < s.size() && s[i + 1] == '(') {
+                substitution();
+                continue;
+            }
+            ++i;
+        }
+        throw std::runtime_error("unterminated quote");
+    };
+    try {
+        while (i < s.size()) {
+            char c = s[i];
+            if (c == ' ' || c == '\t' || c == '\r') {
+                ++i;
+                continue;
+            }
+            if (c == '#') {
+                while (i < s.size() && s[i] != '\n')
+                    ++i;
+                continue;
+            }
+            if (c == ';' || c == '\n') {
+                push(TokKind::Semi, ";");
+                ++i;
+                continue;
+            }
+            if (c == '|' || c == '&') {
+                if (i + 1 < s.size() && s[i + 1] == c) {
+                    push(c == '|' ? TokKind::Or : TokKind::And, s.substr(i, 2));
+                    i += 2;
+                } else if (c == '&' && i + 1 < s.size() && s[i + 1] == '>') {
+                    bool append = i + 2 < s.size() && s[i + 2] == '>';
+                    push(append ? TokKind::RedirBothAppend : TokKind::RedirBoth,
+                         append ? "&>>" : "&>");
+                    i += append ? 3 : 2;
+                } else {
+                    push(c == '|' ? TokKind::Pipe : TokKind::Bg, s.substr(i++, 1));
                 }
-                if (depth == 0) {
-                    w += line.substr(i, j - i);   // keep the $(...) text verbatim
-                    qk = QuoteKind::Double;       // expands; output is not re-globed/re-split
-                    i = j;
-                    any = true;
+                continue;
+            }
+            if (c == '<' || c == '>' || (c == '2' && i + 1 < s.size() && s[i + 1] == '>')) {
+                bool stderr_redir = c == '2';
+                if (stderr_redir)
+                    ++i;
+                char direction = s[i++];
+                bool append = i < s.size() && s[i] == direction;
+                if (append) {
+                    if (direction == '<')
+                        throw std::runtime_error("here documents are not supported");
+                    ++i;
+                }
+                auto k = direction == '<' ? TokKind::RedirIn
+                         : stderr_redir   ? (append ? TokKind::RedirErrAppend : TokKind::RedirErr)
+                                          : (append ? TokKind::RedirAppend : TokKind::RedirOut);
+                push(k, direction == '<' ? "<"
+                        : stderr_redir   ? (append ? "2>>" : "2>")
+                                         : (append ? ">>" : ">"));
+                if (i < s.size() && s[i] == '&') {
+                    if (i + 1 >= s.size() || (s[i + 1] != '1' && s[i + 1] != '2'))
+                        throw std::runtime_error(
+                            "only >&1 and >&2 descriptor duplication is supported");
+                    push(TokKind::Word, s.substr(i, 2));
+                    i += 2;
+                }
+                continue;
+            }
+            size_t start = i;
+            while (i < s.size()) {
+                char d = s[i];
+                if (d == '\\') {
+                    escaped();
                     continue;
                 }
-                // unbalanced: '$' stays literal
-            }
-            if (d == ' ' || d == '\t' || d == '\r' || d == '\n' || d == ';' || d == '|' || d == '&' || d == '<' || d == '>' || (d == '#' && w.empty())) break;
-            w += d; ++i; any = true;
-        }
-        if (in_single || in_double) {
-            if (err) *err = "unterminated quote";
-            return {};
-        }
-        if (any || qk != QuoteKind::None) {
-            // bash-style `2>` / `2>>`: an unquoted word that is exactly "2"
-            // immediately followed by '>' is a stderr redirect, not an arg.
-            if (qk == QuoteKind::None && w == "2" && i < n && line[i] == '>') {
-                if (i + 1 < n && line[i + 1] == '>') { push(TokKind::RedirErrAppend, "2>>"); i += 2; }
-                else { push(TokKind::RedirErr, "2>"); ++i; }
-                if (i < n && line[i] == '&' && i + 1 < n && line[i + 1] == '1') {
-                    push(TokKind::Word, "&1"); i += 2;
+                if (d == '\'' || d == '"') {
+                    quoted(d);
+                    continue;
                 }
-                continue;
+                if (d == '$' && i + 1 < s.size() && s[i + 1] == '(') {
+                    substitution();
+                    continue;
+                }
+                if (d == '$' && i + 1 < s.size() && s[i + 1] == '{') {
+                    auto end = s.find('}', i + 2);
+                    if (end == std::string::npos)
+                        throw std::runtime_error("unterminated parameter expansion");
+                    i = end + 1;
+                    continue;
+                }
+                if (d == '`')
+                    throw std::runtime_error("backtick substitution is unsupported; use $(...)");
+                if (std::string(" \t\r\n;|&<>").find(d) != std::string::npos)
+                    break;
+                ++i;
             }
-            Token t; t.kind = TokKind::Word; t.text = w; t.quote_kind = qk;
-            t.had_quotes = saw_quote;
+            Token t;
+            t.kind = TokKind::Word;
+            t.raw = s.substr(start, i - start);
+            char q = 0;
+            for (size_t j = 0; j < t.raw.size(); ++j) {
+                char d = t.raw[j];
+                if (d == '\\' && q != '\'' && j + 1 < t.raw.size()) {
+                    t.text += d;
+                    t.text += t.raw[++j];
+                    continue;
+                }
+                // Preserve substitutions intact, including their inner quotes.
+                if (d == '$' && q != '\'' && j + 1 < t.raw.size() &&
+                    (t.raw[j + 1] == '(' || t.raw[j + 1] == '{')) {
+                    // t.text is only a compatibility view; expansion uses t.raw.
+                    t.text += t.raw.substr(j);
+                    break;
+                }
+                if ((d == '\'' || d == '"') && (!q || q == d)) {
+                    q = q ? 0 : d;
+                    t.had_quotes = true;
+                    t.quote_kind = d == '\'' ? QuoteKind::Single : QuoteKind::Double;
+                    continue;
+                }
+                t.text += d;
+            }
             out.push_back(t);
         }
+    } catch (const std::exception &e) {
+        if (error)
+            *error = e.what();
+        return {};
     }
     return out;
 }
-
-}  // namespace ang
+} // namespace ang
