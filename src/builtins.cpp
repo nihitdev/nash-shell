@@ -101,7 +101,19 @@ int run_builtin(const std::vector<std::string> &args, ShellState &st, bool *hand
     if (c == "integrations")
         return bi_integrations(args, st);
     if (c == "nash-prompt") {
-        std::cout << make_prompt(st, args.size() > 1 && args[1] == "--right");
+        auto preview = st;
+        bool right = false;
+        for (size_t i = 1; i < args.size(); ++i) {
+            if (args[i] == "--right")
+                right = true;
+            else if (args[i] == "--engine" && i + 1 < args.size()) {
+                preview.prompt_engine = args[++i];
+                if (preview.prompt_engine != "native" && preview.prompt_engine != "starship")
+                    return 2;
+            } else
+                return 2;
+        }
+        std::cout << make_prompt(preview, right);
         return 0;
     }
     if (c == "fg" || c == "bg")

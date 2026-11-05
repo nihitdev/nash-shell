@@ -2,6 +2,8 @@
 
 ## 0.2.0 — unreleased
 
+- Use Nash's own native prompt by default; enable Starship explicitly in TOML.
+
 - Establish Nash as an attributed fork of ang.sh; retain upstream history and MIT copyright.
 - Move build to C++23; remove bundled package builds and duplicated source trees.
 - Add native Starship argv integration, real prompt context, timeout and native fallback.

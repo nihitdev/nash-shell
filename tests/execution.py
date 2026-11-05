@@ -59,28 +59,28 @@ class ShellTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             p=pathlib.Path(d,'starship'); p.write_text('#!/usr/bin/python3\nimport sys,os\nprint("|".join(sys.argv[1:])+"|shell="+os.environ.get("STARSHIP_SHELL",""),end="")\n'); p.chmod(0o755)
             env=dict(os.environ,PATH=d+':'+os.environ['PATH'])
-            r=self.run_shell('false; nash-prompt',env=env)
+            r=self.run_shell('false; nash-prompt --engine starship',env=env)
             self.assertIn('prompt|--status|1|',r.stdout)
             self.assertIn('|--path|'+os.getcwd(),r.stdout)
             self.assertIn('|shell=nash',r.stdout)
-            self.assertIn('|--right|',self.run_shell('nash-prompt --right',env=env).stdout)
+            self.assertIn('|--right|',self.run_shell('nash-prompt --engine starship --right',env=env).stdout)
     @unittest.skipUnless(__import__('shutil').which('starship'),'Starship unavailable')
     def test_real_starship(self):
         with tempfile.TemporaryDirectory() as d:
             config=pathlib.Path(d,'starship.toml')
             config.write_text('add_newline = false\nformat = "$character$status$directory"\n[character]\nsuccess_symbol = "OK"\nerror_symbol = "FAIL"\n[status]\ndisabled = false\nformat = "[$status]($style)"\n[directory]\ntruncation_length = 0\n')
             env=dict(os.environ,STARSHIP_CONFIG=str(config),TERM='xterm-256color')
-            r=self.run_shell('false; nash-prompt',env=env)
+            r=self.run_shell('false; nash-prompt --engine starship',env=env)
             self.assertIn('FAIL',r.stdout); self.assertIn('1',r.stdout)
             config.write_text('add_newline = false\nformat = "α\\n$git_branch$git_status$character"\n[character]\nsuccess_symbol = "❯"\n')
             subprocess.run(['git','init','-q',d],check=True)
             pathlib.Path(d,'dirty').write_text('x')
-            r=self.run_shell(f'cd {d}; nash-prompt',env=env)
+            r=self.run_shell(f'cd {d}; nash-prompt --engine starship',env=env)
             self.assertIn('α\n',r.stdout); self.assertIn('❯',r.stdout)
             self.assertTrue('master' in r.stdout or 'main' in r.stdout,r.stdout)
     def test_fallback(self):
         env=dict(os.environ,PATH='/nonexistent',NO_COLOR='1')
-        r=self.run_shell('false; nash-prompt',env=env)
+        r=self.run_shell('false; nash-prompt --engine starship',env=env)
         self.assertIn('1',r.stdout); self.assertIn('❯',r.stdout)
 
     def test_assignment_scope(self):
@@ -108,7 +108,7 @@ class ShellTests(unittest.TestCase):
             p=pathlib.Path(d,'starship');p.write_text('#!/bin/sh\nsleep 10\n');p.chmod(0o755)
             env=dict(os.environ,PATH=d+':'+os.environ['PATH'],NO_COLOR='1')
             import time
-            start=time.monotonic();r=self.run_shell('nash-prompt',env=env)
+            start=time.monotonic();r=self.run_shell('nash-prompt --engine starship',env=env)
             self.assertLess(time.monotonic()-start,4)
             self.assertIn('❯',r.stdout)
     def test_scripts(self):
@@ -121,6 +121,17 @@ class ShellTests(unittest.TestCase):
             self.check(f"cd {d}; echo file > '&1'; cat '&1'",'file\n')
     def test_unexported_assignment(self):
         self.check('unset NASH_LOCAL_ONLY; NASH_LOCAL_ONLY=private; printenv NASH_LOCAL_ONLY; echo $?','1\n')
+    def test_native_default_ignores_starship(self):
+        with tempfile.TemporaryDirectory() as d:
+            marker=pathlib.Path(d,'called')
+            tool=pathlib.Path(d,'starship')
+            tool.write_text('#!/bin/sh\ntouch "'+str(marker)+'"\nprintf inherited-prompt\n')
+            tool.chmod(0o755)
+            env=dict(os.environ,PATH=d+':'+os.environ['PATH'],STARSHIP_CONFIG='/unused/fish.toml',NO_COLOR='1')
+            result=self.run_shell('nash-prompt',env=env)
+            self.assertIn('nash ',result.stdout)
+            self.assertIn('\n❯ ',result.stdout)
+            self.assertFalse(marker.exists())
     def test_empty_command(self):
         self.check('')
 if __name__=='__main__': unittest.main()

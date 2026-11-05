@@ -1,6 +1,6 @@
 # ~/.config/nash/config.toml
 [prompt]
-engine = "starship"
+engine = "native" # Change to "starship" to use your existing Starship configuration.
 fallback = "native"
 timeout_ms = 1500
 # theme = "minimal" # used by native prompt; installed themes available after installation

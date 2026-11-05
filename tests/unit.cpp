@@ -24,6 +24,7 @@ int main() {
     require(!ang::input_complete("echo 'unfinished"), "quote continuation");
     require(!ang::input_complete("echo hi |"), "pipeline continuation");
     ang::ShellState st;
+    require(st.prompt_engine == "native", "native prompt must be the default");
     require(!ang::highlight_line("echo  'a b'", st).empty(), "highlight rendering");
     std::cout << "unit checks passed\n";
 }

@@ -38,7 +38,9 @@ cmake --install build
 
 ## Starship: keep your existing prompt
 
-Nash automatically uses `starship` from PATH. Starship itself reads your existing
+Nash uses its own native prompt by default. To opt into Starship later, select
+`engine = "starship"` in the configuration below. Nash then detects `starship` from PATH.
+Starship itself reads your existing
 `~/.config/starship.toml`, or `STARSHIP_CONFIG` when set. No conversion, duplicated prompt,
 Bash init script, or hardcoded Nerd Font symbols are required.
 
@@ -56,6 +58,7 @@ physical and logical working directories, terminal width, and active job count t
 `starship prompt`. It sets `STARSHIP_SHELL=nash` and a session key. Git modules run through
 Starship itself. ANSI, Unicode, and multiline left prompts are preserved. `--right` output
 is shown on the input row when it is a single line and fits without overlapping input.
+Preview either engine with `nash-prompt --engine native` or `nash-prompt --engine starship`.
 The prompt is generated once per input, not per keystroke. Missing, failing, or timed-out
 Starship processes fall back to the native prompt; a missing right prompt simply disappears.
 
@@ -90,7 +93,7 @@ session memory; disk history is append-only and multiline records remain session
 
 ## Customization and tools
 
-See [examples/config.toml](examples/config.toml). Set `engine = "native"` and choose a
+See [examples/config.toml](examples/config.toml). The default engine is `native`; choose a
 `theme` after installation. Shipped templates: minimal, classic, modern, catppuccin,
 rose-pine, tokyo-night, gruvbox, nord, dracula, monochrome, plus inherited themes.
 Native templates accept ANSI palette names and true-color `{#RRGGBB}` spans. `NO_COLOR` and `TERM=dumb` disable native and editor colors. Starship controls its own colors.

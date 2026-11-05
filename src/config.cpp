@@ -9,7 +9,8 @@
 #include <toml++/toml.hpp>
 namespace ang {
 void apply_defaults(ShellState &st) {
-    st.prompt_left = "{blue}{cwd}{reset} {fail}{arrow} ";
+    st.prompt_left =
+        "{bold}{cyan}nash{reset} {blue}{cwd}{reset}{purple}{branch}{reset}\n{fail}{arrow} ";
     st.prompt_right.clear();
     st.history_file = data_dir() + "/history";
 }

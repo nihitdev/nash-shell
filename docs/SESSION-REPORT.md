@@ -100,3 +100,17 @@ job-control/completion-only follow-up. Formatting and diff-whitespace checks pas
 
 GitHub Actions passed for both the implementation commit and the first report commit.
 The final follow-up's remote workflow is separate and can be inspected on GitHub.
+
+## Prompt default preference update
+
+At the user's subsequent request, Nash now starts with its own native two-line prompt,
+including a Nash label, working directory, branch when available and status-aware arrow.
+Starship is selected explicitly through `[prompt].engine = "starship"`. Example TOML and
+README match the new default. `nash-prompt --engine native|starship` previews an engine.
+
+Debug and Release builds succeeded. Debug CTest passed all three suites in 8.25 s,
+including 26 execution tests and 21 PTY tests. Release execution tests also passed (26).
+The new regression confirms an inherited Starship environment never activates Starship
+when the default native engine is selected. Explicit Starship tests continue to pass.
+A fresh PTY session verified the already installed executable displays the native prompt
+using the user's new Nash config; its existing Starship config was untouched.

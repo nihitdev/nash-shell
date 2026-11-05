@@ -30,7 +30,7 @@ struct ShellState {
 
     std::string history_file;
     bool interactive = false;
-    std::string prompt_engine = "starship";
+    std::string prompt_engine = "native";
     std::string startup_file;
     int prompt_timeout_ms = 1500;
     long long command_duration_ms = 0;
