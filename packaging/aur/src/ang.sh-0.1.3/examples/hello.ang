@@ -1,7 +1,0 @@
-#!/usr/bin/env angsh
-# hello.ang — angsh script example (also works with `angsh hello.ang`)
-echo "hello from angsh!"
-echo "cwd: $PWD status demo follows:"
-true && echo "true works" || echo "unreachable"
-false || echo "false -> or-branch works"
-echo hello | tr a-z A-Z

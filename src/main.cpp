@@ -1,4 +1,4 @@
-// main.cpp — angsh entry point: CLI flags, script mode, and the REPL.
+// main.cpp — nash entry point: CLI flags, script mode, and the REPL.
 #include <unistd.h>
 #include <filesystem>
 #include <iostream>
@@ -14,18 +14,18 @@
 #include "prompt.h"
 #include "util.h"
 
-#ifndef ANG_VERSION
-#define ANG_VERSION "0.1.3"
+#ifndef NASH_VERSION
+#define NASH_VERSION "0.1.3"
 #endif
 
 namespace {
 void usage() {
     std::cout <<
-        "usage: angsh [--posix|--ang] [--no-config] [-c CMD] [SCRIPT [ARGS...]]\n"
+        "usage: nash [--posix|--ang] [--no-config] [-c CMD] [SCRIPT [ARGS...]]\n"
         "  --posix      start in POSIX-compatible mode\n"
         "  --ang        start in Ang mode (default)\n"
         "  -c CMD       run CMD and exit\n"
-        "  SCRIPT       run file as angsh script\n"
+        "  SCRIPT       run file as nash script\n"
         "  --version    print version\n"
         "  --help       print this help\n";
 }
@@ -107,7 +107,7 @@ int main(int argc, char** argv) {
         else if (a == "--no-config" || a == "--noconfig") no_config = true;
         else if ((a == "-c" || a == "--command") && i + 1 < argc) cmd = argv[++i];
         else if (a == "--version" || a == "-v") {
-            std::cout << "angsh " ANG_VERSION "\n";
+            std::cout << "nash " NASH_VERSION "\n";
             return 0;
         } else if (a == "--help" || a == "-h") { usage(); return 0; }
         else if (!a.empty() && a[0] == '-') { usage(); return 2; }
@@ -122,8 +122,8 @@ int main(int argc, char** argv) {
     st.interactive = isatty(STDIN_FILENO) && script.empty() && cmd.empty();
     if (!no_config) ang::load_config(st);
     else ang::apply_defaults(st);
-    // Env override wins for scripting in every mode: ANG_POSIX=1 angsh
-    if (const char* p = getenv("ANG_POSIX"))
+    // Env override wins for scripting in every mode: NASH_POSIX=1 nash
+    if (const char* p = getenv("NASH_POSIX"))
         if (std::string(p) == "1" || std::string(p) == "on") st.posix = true;
 
     if (!cmd.empty()) return run_one(cmd, st);
@@ -147,10 +147,10 @@ int main(int argc, char** argv) {
                   << " | (_| | | | | (_| \\__ \\ | | |\n"
                   << "  \\__,_|_| |_|\\__, |___/_| |_|\n"
                   << "               |___/  " << R
-                  << D << "v" ANG_VERSION
+                  << D << "v" NASH_VERSION
                   << (st.posix ? " · posix mode" : " · ang mode")
                   << " · theme " << st.theme_name << R << "\n"
-                  << D << "  type `help` to see what angsh can do." << R << "\n";
+                  << D << "  type `help` to see what nash can do." << R << "\n";
     }
 
     while (!ang::g_should_exit) {

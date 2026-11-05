@@ -65,14 +65,14 @@ std::string expand_tilde(const std::string& p) {
 
 std::string config_dir() {
     const char* x = std::getenv("XDG_CONFIG_HOME");
-    if (x && *x) return std::string(x) + "/angsh";
-    return home_dir() + "/.config/angsh";
+    if (x && *x) return std::string(x) + "/nash";
+    return home_dir() + "/.config/nash";
 }
 
 std::string data_dir() {
     const char* x = std::getenv("XDG_DATA_HOME");
-    if (x && *x) return std::string(x) + "/angsh";
-    return home_dir() + "/.local/share/angsh";
+    if (x && *x) return std::string(x) + "/nash";
+    return home_dir() + "/.local/share/nash";
 }
 
 std::string join(const std::vector<std::string>& v, const std::string& sep) {
@@ -106,7 +106,7 @@ bool use_color(int fd) {
 }
 
 std::string err_prefix() {
-    return use_color(STDERR_FILENO) ? "\033[31mangsh\033[0m: " : "angsh: ";
+    return use_color(STDERR_FILENO) ? "\033[31mnash\033[0m: " : "nash: ";
 }
 
 }  // namespace ang

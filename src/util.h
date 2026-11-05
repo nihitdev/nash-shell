@@ -1,4 +1,4 @@
-// util.h — tiny string/path helpers used across angsh.
+// util.h — tiny string/path helpers used across nash.
 // Keep this dependency-free so new contributors only learn std::string.
 #pragma once
 #include <string>
@@ -17,8 +17,8 @@ bool is_assign_word(const std::string& w, std::string* name = nullptr,
 bool is_valid_name(const std::string& n);
 
 std::string home_dir();
-std::string config_dir();   // $XDG_CONFIG_HOME/angsh or ~/.config/angsh
-std::string data_dir();     // $XDG_DATA_HOME/angsh or ~/.local/share/angsh
+std::string config_dir();   // $XDG_CONFIG_HOME/nash or ~/.config/nash
+std::string data_dir();     // $XDG_DATA_HOME/nash or ~/.local/share/nash
 std::string expand_tilde(const std::string& p);
 
 std::string join(const std::vector<std::string>& v, const std::string& sep);
@@ -38,7 +38,7 @@ struct QuoteSpec {
 
 // Color support: false when NO_COLOR is set, TERM=dumb, or fd is not a TTY.
 bool use_color(int fd);
-// "angsh:" prefix for errors — red when stderr is a color terminal.
+// "nash:" prefix for errors — red when stderr is a color terminal.
 std::string err_prefix();
 
 }  // namespace ang

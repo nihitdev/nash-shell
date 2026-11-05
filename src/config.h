@@ -1,5 +1,5 @@
-// config.h — loads ~/.config/angsh/config.ang, theme.conf, plugins/*.ang.
-// All config lines are plain angsh commands, so ricing needs no new language.
+// config.h — loads ~/.config/nash/config.ang, theme.conf, plugins/*.ang.
+// All config lines are plain nash commands, so ricing needs no new language.
 #pragma once
 #include "env.h"
 

@@ -13,8 +13,8 @@
 #include <limits.h>
 #include <sys/wait.h>
 
-#ifndef ANG_VERSION
-#define ANG_VERSION "0.1.3"
+#ifndef NASH_VERSION
+#define NASH_VERSION "0.1.3"
 #endif
 
 namespace ang {
@@ -268,11 +268,11 @@ int bi_source(const std::vector<std::string>& a, ShellState& st) {
         if (skip || g_should_exit) continue;
         std::string lerr;
         auto toks = lex(s, &lerr);
-        if (!lerr.empty()) { std::cerr << "angsh: " << lerr << "\n"; continue; }
+        if (!lerr.empty()) { std::cerr << "nash: " << lerr << "\n"; continue; }
         JobList jobs;
         std::string perr;
         if (!parse(toks, st.posix, &jobs, &perr)) {
-            std::cerr << "angsh: " << perr << "\n";
+            std::cerr << "nash: " << perr << "\n";
             continue;
         }
         run_jobs(jobs, st);
@@ -291,9 +291,9 @@ int bi_history(const std::vector<std::string>& a, ShellState& st) {
 int bi_help(const std::vector<std::string>&, ShellState&) {
     if (!use_color(STDOUT_FILENO)) {
         std::cout <<
-            "angsh " ANG_VERSION " — builtin help\n"
+            "nash " NASH_VERSION " — builtin help\n"
             "Modes:  Ang (default): `set FOO bar`   POSIX: `export FOO=bar`, `FOO=bar cmd`\n"
-            "        Toggle: `posix on|off`, `set --posix on|off`, `angsh --posix`\n"
+            "        Toggle: `posix on|off`, `set --posix on|off`, `nash --posix`\n"
             "Flow:   cmd | cmd, >, >>, <, 2>, 2>>, &>, 2>&1, &&, ||, ;, & (bg)\n"
             "Subst:  $(cmd) command substitution\n"
             "Input:  read [-p PROMPT] NAME...\n"
@@ -301,7 +301,7 @@ int bi_help(const std::vector<std::string>&, ShellState&) {
             "Builtins: cd pwd exit echo export unset set alias unalias abbr posix\n"
             "          source history help version true false type theme env autocd\n"
             "          read jobs wait\n"
-            "Ricing: ~/.config/angsh/config.ang, themes/<name>.conf, plugins/*.ang\n"
+            "Ricing: ~/.config/nash/config.ang, themes/<name>.conf, plugins/*.ang\n"
             "Keys:   Tab complete, Right/Ctrl-F accept suggestion, Up/Down history,\n"
             "        Ctrl-A/E/U/K/W, !! / !$ history expansion\n";
         return 0;
@@ -327,7 +327,7 @@ int bi_help(const std::vector<std::string>&, ShellState&) {
         std::cout << " " << B << "\u2502" << R << "\n";
     };
 
-    std::string hdr = "angsh " ANG_VERSION;
+    std::string hdr = "nash " NASH_VERSION;
     std::string top = "\u2500 " + hdr + " ";
     std::cout << "  " << B << "\u256d" << top
               << dashes(61 - visible_len(top)) << "\u256e" << R << "\n";
@@ -337,7 +337,7 @@ int bi_help(const std::vector<std::string>&, ShellState&) {
     row("  POSIX          " + C + "export FOO=bar" + R + "  " + D + "or" + R +
         "  " + C + "FOO=bar cmd" + R);
     row("  toggle: " + C + "posix on|off" + R + "  " + D + "or" + R + "  " +
-        C + "angsh --posix" + R);
+        C + "nash --posix" + R);
     row(H + "flow" + R);
     row("  " + C + "cmd | cmd" + R + "   " + C + "> >> < 2> 2>&1 &>" + R +
         "   " + C + "&& || ; &" + R);
@@ -352,7 +352,7 @@ int bi_help(const std::vector<std::string>&, ShellState&) {
     row("  abbr posix source history help version type theme");
     row("  env autocd true false read jobs wait");
     row(H + "ricing" + R);
-    row("  " + D + "~/.config/angsh/" + R + "config.ang theme.conf plugins/*.ang");
+    row("  " + D + "~/.config/nash/" + R + "config.ang theme.conf plugins/*.ang");
     row("  " + C + "theme rice" + R + "  " + D + "(default minimal rice power mono)" + R);
     row(H + "keys" + R);
     row("  " + C + "Tab" + R + " complete  " + C + "\u2192/Ctrl-F" + R +
@@ -365,7 +365,7 @@ int bi_help(const std::vector<std::string>&, ShellState&) {
 }
 
 int bi_version(const std::vector<std::string>&, ShellState& st) {
-    std::cout << st.shell_name << " " ANG_VERSION
+    std::cout << st.shell_name << " " NASH_VERSION
               << (st.posix ? " (posix)" : " (ang)") << "\n";
     return 0;
 }

@@ -1,7 +1,0 @@
-post_install() {
-  echo ":: angsh — a small shell with Ang and POSIX syntax modes."
-  echo ":: Try it: run 'angsh' in any terminal."
-  echo ":: To make it your login shell, add it to /etc/shells first:"
-  echo "::   echo /usr/bin/angsh | sudo tee -a /etc/shells && chsh -s /usr/bin/angsh"
-  echo ":: Browse prompt themes inside angsh with: theme list"
-}

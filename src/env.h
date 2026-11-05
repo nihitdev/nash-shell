@@ -19,7 +19,7 @@ struct ShellState {
     bool autocd = false;    // zsh-style: bare directory name cds into it
     int last_status = 0;     // $?
     pid_t last_bg_pid = 0;   // $!
-    std::string shell_name = "angsh";
+    std::string shell_name = "nash";
     std::string theme_name = "default";
 
     // Prompt templates (see prompt.cpp + themes/*.conf).

@@ -155,8 +155,8 @@ static std::string theme_search_path(const std::string& name) {
         config_dir() + "/themes/" + name + ".conf",
         config_dir() + "/theme.conf",
         std::string("themes/") + name + ".conf",
-        "/usr/local/share/angsh/themes/" + name + ".conf",
-        "/usr/share/angsh/themes/" + name + ".conf",
+        "/usr/local/share/nash/themes/" + name + ".conf",
+        "/usr/share/nash/themes/" + name + ".conf",
     };
     for (auto& c : cands) {
         std::ifstream f(c);

@@ -1,5 +1,0 @@
-# Example plugin: git prompt helper + shortcut.
-# Drop this in ~/.config/angsh/plugins/git.ang
-alias gs 'git status -sb'
-alias gp 'git pull --ff-only'
-abbr add gc 'git commit'

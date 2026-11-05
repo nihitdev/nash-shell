@@ -1,9 +1,0 @@
-# examples/sub.ang — command substitution demo (v0.1.2)
-# $(cmd) runs cmd and substitutes its stdout (trailing newlines stripped).
-set today $(date +%A)
-set here $(pwd)
-echo "today is $today"
-echo "you are in $here"
-echo "hostname: $(uname -n)"
-echo 'single quotes stay literal: $(not a command)'
-echo "status of last echo: $?"

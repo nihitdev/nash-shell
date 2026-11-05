@@ -16,7 +16,7 @@
 //   styles: {dim} {bold} {reset}
 //
 // Example: "{gray}{user}@{host}{reset} {bold}{blue}{cwd}{reset}{purple}{branch}{reset} {arrow} "
-// Ricing = editing themes/<name>.conf or ~/.config/angsh/theme.conf.
+// Ricing = editing themes/<name>.conf or ~/.config/nash/theme.conf.
 #pragma once
 #include <string>
 #include "env.h"

@@ -52,7 +52,7 @@ void load_config(ShellState& st) {
     if (tc) load_theme(config_dir() + "/theme.conf", st, nullptr);
     (void)err;
 
-    // Main config: plain angsh commands.
+    // Main config: plain nash commands.
     std::ifstream cfg(config_dir() + "/config.ang");
     std::string line;
     if (cfg) {
@@ -77,8 +77,8 @@ void load_config(ShellState& st) {
         }
     }
 
-    // Env override wins for scripting: ANG_POSIX=1 angsh
-    if (const char* p = getenv("ANG_POSIX"))
+    // Env override wins for scripting: NASH_POSIX=1 nash
+    if (const char* p = getenv("NASH_POSIX"))
         if (std::string(p) == "1" || std::string(p) == "on") st.posix = true;
 
     // Load history
