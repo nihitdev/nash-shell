@@ -374,7 +374,7 @@ static std::optional<std::string> edit_line(ShellState &st, const std::string &l
                     break;
                 }
         } else if (c == '\t' && st.completion_enabled && !paste) {
-            auto start = buffer.find_last_of(" \t;|&", cursor ? cursor - 1 : 0);
+            auto start = cursor ? buffer.find_last_of(" \t;|&", cursor - 1) : std::string::npos;
             start = start == std::string::npos ? 0 : start + 1;
             auto prefix = buffer.substr(start, cursor - start);
             if (prefix.find_first_of("'\"\\$") == std::string::npos) {

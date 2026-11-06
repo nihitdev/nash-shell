@@ -26,3 +26,8 @@ The documentation suite validates local handbook links and runs the shipped `con
 plus Fastfetch/alias recipes against isolated executable fixtures. It checks that optional
 startup output remains opt-in. This is recipe regression coverage, not a claim that every
 third-party terminal program has a native adapter or has been interactively tested.
+
+The reliability suite adds 86 Bash command/expansion comparisons and 36 read/IFS comparisons,
+plus focused regression cases. It executes supported syntax in temporary directories and
+avoids personal startup files. See [the audit](RELIABILITY.md) for failures, root causes and
+fixes; passing these cases is not a claim of complete POSIX compliance.

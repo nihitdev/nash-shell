@@ -6,6 +6,7 @@
 #include "prompt.h"
 #include "shell.h"
 #include "util.h"
+#include <cerrno>
 #include <chrono>
 #include <clocale>
 #include <cstdlib>
@@ -66,18 +67,40 @@ int main(int argc, char **argv) {
     if (has_command)
         return ang::run_source(command, st);
     if (!st.interactive) {
-        std::ostringstream source;
-        if (script.empty())
-            source << std::cin.rdbuf();
-        else {
-            std::ifstream f(script);
-            if (!f) {
+        if (!script.empty()) {
+            std::ifstream file(script);
+            if (!file) {
                 std::cerr << "nash: cannot read " << script << '\n';
                 return 127;
             }
-            source << f.rdbuf();
+            std::ostringstream source;
+            source << file.rdbuf();
+            ang::run_source(source.str(), st);
+        } else {
+            // Consume one logical command at a time; builtin read shares fd 0.
+            std::string pending;
+            while (!ang::g_should_exit) {
+                char c;
+                const auto count = ::read(STDIN_FILENO, &c, 1);
+                if (count < 0) {
+                    if (errno == EINTR)
+                        continue;
+                    std::cerr << "nash: stdin: read failed\n";
+                    st.last_status = 1;
+                    break;
+                }
+                if (count == 0) {
+                    if (!pending.empty())
+                        ang::run_source(pending, st);
+                    break;
+                }
+                if (c == '\n' && ang::input_complete(pending)) {
+                    ang::run_source(pending, st);
+                    pending.clear();
+                } else
+                    pending += c;
+            }
         }
-        ang::run_source(source.str(), st);
         return ang::g_should_exit ? ang::g_exit_code : st.last_status;
     }
     std::string pending;

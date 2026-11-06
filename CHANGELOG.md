@@ -2,6 +2,12 @@
 
 ## 0.2.0 — unreleased
 
+- Audit supported commands against Bash and add a dedicated reliability suite.
+- Fix whole-token aliases, assignment previews, substitution statuses, recursive defaults and IFS splitting.
+- Share bounded delimiter scanners; preserve significant escaped whitespace and substitution comments.
+- Fix standard descriptor prefixes, read EOF/buffering/stdin ownership and Ctrl-C recovery.
+- Validate exit/cd/type/wait behavior, forward env arguments, and fix completion at the input start.
+
 - Add opt-in native Fastfetch startup and managed Eza/Bat shortcuts; preserve user aliases and skip absent tools.
 - Add an Arch-inspired documentation website with searchable handbook, tool directory, themes and local config builder.
 

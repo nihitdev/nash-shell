@@ -11,8 +11,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
+#include <functional>
 #include <iostream>
 #include <optional>
+#include <set>
 #include <signal.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -37,8 +39,8 @@ static void flush_all() {
 
 std::string preprocess(const std::string &line, ShellState &st, bool *skip) {
     *skip = false;
-    std::string s = trim(line);
-    if (s.empty() || s[0] == '#') {
+    std::string s = line;
+    if (trim(s).empty()) {
         *skip = true;
         return "";
     }
@@ -59,151 +61,65 @@ std::string preprocess(const std::string &line, ShellState &st, bool *skip) {
         }
     }
 
-    // fish-style abbreviation + bash-style alias: expand the first word of
-    // EVERY command — the line start and each command after ; | && || (the
-    // scan is quote-aware; redirect targets are not expanded). Alias chains
-    // expand up to 10 deep, like bash.
-    {
-        std::string out;
-        bool at_cmd_start = true;   // start of a new command word zone
-        bool expect_target = false; // last op was a redirection -> next word is a file
-        for (size_t i = 0; i < s.size();) {
-            char c = s[i];
-            if (c == '\\') { // escape pair: verbatim
-                out += c;
-                if (i + 1 < s.size())
-                    out += s[i + 1];
-                i += 2;
-                continue;
-            }
-            if (c == '#') { // comment: keep as-is
-                out += s.substr(i);
-                break;
-            }
-            if (c == '\'') { // single-quoted: verbatim
-                size_t e = s.find('\'', i + 1);
-                e = (e == std::string::npos) ? s.size() : e + 1;
-                out += s.substr(i, e - i);
-                i = e;
-                continue;
-            }
-            if (c == '"') { // double-quoted: honor \"
-                out += '"';
-                ++i;
-                while (i < s.size()) {
-                    if (s[i] == '\\' && i + 1 < s.size()) {
-                        out += s.substr(i, 2);
-                        i += 2;
-                        continue;
-                    }
-                    out += s[i];
-                    char q = s[i];
-                    ++i;
-                    if (q == '"')
-                        break;
-                }
-                continue;
-            }
-            if (c == ';') {
-                out += c;
-                ++i;
-                at_cmd_start = true;
-                expect_target = false;
-                continue;
-            }
-            if (c == '&') {
-                if (i + 1 < s.size() && s[i + 1] == '&') {
-                    out += "&&";
-                    i += 2;
-                } else {
-                    out += c;
-                    ++i;
-                }
-                at_cmd_start = true;
-                expect_target = false;
-                continue;
-            }
-            if (c == '|') {
-                if (i + 1 < s.size() && s[i + 1] == '|') {
-                    out += "||";
-                    i += 2;
-                } else {
-                    out += c;
-                    ++i;
-                }
-                at_cmd_start = true;
-                expect_target = false;
-                continue;
-            }
-            if (c == '>' || (c == '2' && i + 1 < s.size() && s[i + 1] == '>')) {
-                if (c == '2') {
-                    out += s.substr(i, 2);
-                    i += 2;
-                } else if (i + 1 < s.size() && s[i + 1] == '>') {
-                    out += ">>";
-                    i += 2;
-                } else {
-                    out += c;
-                    ++i;
-                }
-                at_cmd_start = false;
-                expect_target = true;
-                continue;
-            }
-            if (c == '<') {
-                out += c;
-                ++i;
-                at_cmd_start = false;
-                expect_target = true;
-                continue;
-            }
-            if (std::isspace((unsigned char)c)) {
-                out += c;
-                ++i;
-                continue;
-            }
-            // word start
-            size_t w0 = i;
-            while (i < s.size() && !std::isspace((unsigned char)s[i]) && s[i] != ';' &&
-                   s[i] != '&' && s[i] != '|' && s[i] != '<' && s[i] != '>' && s[i] != '\'' &&
-                   s[i] != '"' && s[i] != '\\')
-                ++i;
-            std::string word = s.substr(w0, i - w0);
-            if (!at_cmd_start || expect_target) {
-                out += word;
-                at_cmd_start = false;
-                expect_target = false;
-                continue;
-            }
-            // command word: expand abbreviations and top-level aliases
-            std::string body;
-            auto ab = st.abbrs.find(word);
-            if (ab != st.abbrs.end())
-                body = ab->second;
-            for (int k = 0; k < 10; ++k) {
-                std::string fw = body.empty()
-                                     ? word
-                                     : (split_words(body).empty() ? "" : split_words(body).front());
-                auto it = st.aliases.find(fw);
-                if (it == st.aliases.end())
+    // Expand only complete unquoted command tokens. Byte spans preserve every other
+    // character, including quote boundaries, redirects and substitution bodies.
+    std::function<std::string(const std::string &, std::set<std::string>, unsigned)> aliases;
+    aliases = [&](const std::string &source, std::set<std::string> active, unsigned depth) {
+        if (depth > 32)
+            throw std::runtime_error("alias expansion limit exceeded");
+        std::string error;
+        auto tokens = lex(source, &error);
+        if (!error.empty())
+            return source; // normal lexer path reports the diagnostic
+        bool command = true, target = false;
+        size_t copied = 0;
+        std::string result;
+        for (const auto &token : tokens) {
+            if (token.kind != TokKind::Word) {
+                switch (token.kind) {
+                case TokKind::Pipe:
+                case TokKind::And:
+                case TokKind::Or:
+                case TokKind::Semi:
+                case TokKind::Bg:
+                    command = true;
+                    target = false;
                     break;
-                if (body.empty()) {
-                    body = it->second;
-                } else {
-                    size_t cut = body.find(fw);
-                    body = it->second + body.substr(cut == std::string::npos ? 0 : cut + fw.size());
+                default:
+                    target = true;
+                    break;
                 }
-            }
-            if (!body.empty()) {
-                out += body; // remainder of the line continues scanning
-                at_cmd_start = false;
                 continue;
             }
-            out += word;
-            at_cmd_start = false;
+            if (target) {
+                target = false;
+                continue;
+            }
+            if (!command)
+                continue;
+            if (is_assign_word(token.raw))
+                continue;
+            command = false;
+            if (token.had_quotes || token.raw.find('\\') != std::string::npos)
+                continue;
+            const auto &name = token.text;
+            if (active.contains(name))
+                continue;
+            const auto alias = st.aliases.find(name);
+            const auto abbr = st.abbrs.find(name);
+            if (alias == st.aliases.end() && abbr == st.abbrs.end())
+                continue;
+            auto chain = active;
+            chain.insert(name);
+            const auto body = alias != st.aliases.end() ? alias->second : abbr->second;
+            result += source.substr(copied, token.begin - copied);
+            result += aliases(body, std::move(chain), depth + 1);
+            copied = token.end;
         }
-        s = out;
-    }
+        result += source.substr(copied);
+        return result;
+    };
+    s = aliases(s, {}, 0);
     return s;
 }
 
@@ -291,14 +207,14 @@ struct TemporaryEnvironment {
     ShellState &st;
     std::map<std::string, std::optional<std::string>> environment, variables;
     explicit TemporaryEnvironment(ShellState &state) : st(state) {}
-    void set(const std::string &name, const std::string &value) {
+    void set(const std::string &name, const std::string &value, bool exported = true) {
         if (!environment.contains(name)) {
             const char *old = getenv(name.c_str());
             environment[name] = old ? std::optional<std::string>(old) : std::nullopt;
             auto it = st.vars.find(name);
             variables[name] = it == st.vars.end() ? std::nullopt : std::optional(it->second);
         }
-        st.set_var(name, value, true);
+        st.set_var(name, value, exported);
     }
     ~TemporaryEnvironment() {
         for (const auto &[name, value] : environment) {
@@ -317,15 +233,23 @@ struct PreparedCommand {
     std::vector<std::string> args;
     std::vector<Redir> redirects;
     std::vector<std::pair<std::string, std::string>> assignments;
+    std::optional<int> substitution_status;
 };
 PreparedCommand prepare(const SimpleCmd &cmd, ShellState &st) {
     PreparedCommand result;
+    st.substitution_status.reset();
     result.args = expand_args(cmd.args, cmd.quoted, st);
-    for (const auto &a : cmd.assigns) {
-        std::string name, value;
-        is_assign_word(a, &name, &value);
-        auto values = expand_word(value, st, false);
-        result.assignments.emplace_back(name, values.empty() ? "" : values.front());
+    {
+        TemporaryEnvironment assignment_preview(st);
+        for (const auto &a : cmd.assigns) {
+            std::string name, value;
+            is_assign_word(a, &name, &value);
+            auto values = expand_word(value, st, false);
+            const auto value_expanded = values.empty() ? "" : values.front();
+            result.assignments.emplace_back(name, value_expanded);
+            assignment_preview.set(name, value_expanded,
+                                   !result.args.empty() || getenv(name.c_str()) != nullptr);
+        }
     }
     for (const auto &r : cmd.redirs) {
         auto target = r.target;
@@ -340,6 +264,7 @@ PreparedCommand prepare(const SimpleCmd &cmd, ShellState &st) {
         }
         result.redirects.push_back({r.op, target, r.quoted});
     }
+    result.substitution_status = st.substitution_status;
     return result;
 }
 } // namespace
@@ -375,7 +300,8 @@ static int run_pipeline(const Pipeline &pl, ShellState &st) {
                     environment.set(name, value);
             }
             bool handled = false;
-            int rc = cmd.args.empty() ? 0 : run_builtin(cmd.args, st, &handled);
+            int rc = cmd.args.empty() ? cmd.substitution_status.value_or(0)
+                                      : run_builtin(cmd.args, st, &handled);
             st.pipeline_status = {rc};
             return st.last_status = rc;
         }

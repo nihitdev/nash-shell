@@ -1,6 +1,7 @@
 // env.h — shell state: variables, aliases, abbreviations, options.
 #pragma once
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <sys/types.h>
@@ -17,8 +18,9 @@ struct ShellState {
     std::map<std::string, std::string> abbrs;   // fish-style: abbr g='git'
     std::vector<std::string> history;
 
-    bool posix = true;     // false = inherited Ang syntax, true = POSIX-like assignments (default)
-    bool autocd = false;   // zsh-style: bare directory name cds into it
+    bool posix = true;   // false = inherited Ang syntax, true = POSIX-like assignments (default)
+    bool autocd = false; // zsh-style: bare directory name cds into it
+    std::optional<int> substitution_status;
     int last_status = 0;   // $?
     pid_t last_bg_pid = 0; // $!
     std::string shell_name = "nash";

@@ -8,8 +8,11 @@
 #include "prompt.h"
 #include "shell.h"
 #include "util.h"
+#include <algorithm>
+#include <cerrno>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <limits.h>
@@ -92,7 +95,7 @@ int run_builtin(const std::vector<std::string> &args, ShellState &st, bool *hand
         return bi_type(args, st);
     if (c == "theme")
         return bi_theme(args, st);
-    if (c == "env")
+    if (c == "env" && args.size() == 1)
         return bi_env(args, st);
     if (c == "printenv") {
         if (args.size() == 1)
@@ -144,34 +147,60 @@ int run_builtin(const std::vector<std::string> &args, ShellState &st, bool *hand
 }
 
 int bi_cd(const std::vector<std::string> &a, ShellState &st) {
-    (void)st;
-    std::string dest = a.size() > 1 ? expand_tilde(a[1]) : home_dir();
-    if (dest == "-") {
-        const char *o = getenv("OLDPWD");
-        dest = o ? o : home_dir();
-        std::cout << dest << "\n";
+    size_t first = 1;
+    if (first < a.size() && a[first] == "--")
+        ++first;
+    if (a.size() > first + 1) {
+        std::cerr << "nash: cd: too many arguments\n";
+        return 2;
     }
-    char oldc[PATH_MAX];
-    if (!getcwd(oldc, sizeof oldc))
-        oldc[0] = 0;
-    if (chdir(dest.c_str()) != 0) {
-        perror(("cd: " + dest).c_str());
+    const bool previous = first < a.size() && a[first] == "-";
+    std::string destination = first < a.size() ? expand_tilde(a[first]) : home_dir();
+    if (previous) {
+        destination = st.get("OLDPWD");
+        if (destination.empty()) {
+            std::cerr << "nash: cd: OLDPWD not set\n";
+            return 1;
+        }
+    }
+    char old[PATH_MAX];
+    const std::string old_path = getcwd(old, sizeof(old)) ? old : st.get("PWD");
+    if (chdir(destination.c_str()) < 0) {
+        std::cerr << "nash: cd: " << destination << ": " << strerror(errno) << '\n';
         return 1;
     }
-    setenv("OLDPWD", oldc, 1);
-    char nc[PATH_MAX];
-    if (getcwd(nc, sizeof nc))
-        st.set_var("PWD", nc, true);
-    st.set_var("OLDPWD", oldc, true);
+    char current[PATH_MAX];
+    if (getcwd(current, sizeof(current)))
+        st.set_var("PWD", current, true);
+    st.set_var("OLDPWD", old_path, true);
+    if (previous)
+        std::cout << st.get("PWD") << '\n';
     run_hook("chpwd", st);
     return 0;
 }
-
 int bi_exit(const std::vector<std::string> &a, ShellState &st) {
-    (void)st;
+    long long code = st.last_status;
+    if (a.size() > 1) {
+        auto value = trim(a[1]);
+        char *end = nullptr;
+        errno = 0;
+        code = strtoll(value.c_str(), &end, 10);
+        if (value.empty() || end != value.c_str() + value.size() || errno == ERANGE) {
+            std::cerr << "nash: exit: " << a[1] << ": numeric argument required\n";
+            g_should_exit = true;
+            return g_exit_code = 2;
+        }
+        if (a.size() > 2) {
+            std::cerr << "nash: exit: too many arguments\n";
+            if (!st.interactive) {
+                g_should_exit = true;
+                g_exit_code = 1;
+            }
+            return 1;
+        }
+    }
     g_should_exit = true;
-    g_exit_code = a.size() > 1 ? atoi(a[1].c_str()) : st.last_status;
-    return g_exit_code;
+    return g_exit_code = static_cast<unsigned char>(code);
 }
 
 int bi_echo(const std::vector<std::string> &a, ShellState &st) {
@@ -421,24 +450,39 @@ int bi_true(const std::vector<std::string> &, ShellState &) { return 0; }
 int bi_false(const std::vector<std::string> &, ShellState &) { return 1; }
 
 int bi_type(const std::vector<std::string> &a, ShellState &st) {
-    if (need_args(a, 2, "type NAME...") == 2)
+    size_t first = 1;
+    if (first < a.size() && a[first] == "--")
+        ++first;
+    if (first == a.size()) {
+        std::cerr << "usage: type NAME...\n";
         return 2;
-    for (size_t i = 1; i < a.size(); ++i) {
-        bool isb = is_parent_builtin(a[i]) || a[i] == "echo" || a[i] == "pwd" || a[i] == "true" ||
-                   a[i] == "false" || a[i] == "type" || a[i] == "help" || a[i] == "version" ||
-                   a[i] == "env" || a[i] == "which";
-        auto al = st.aliases.find(a[i]);
-        auto ab = st.abbrs.find(a[i]);
-        if (isb)
-            std::cout << a[i] << " is a shell builtin\n";
-        else if (al != st.aliases.end())
-            std::cout << a[i] << " is an alias: " << al->second << "\n";
-        else if (ab != st.abbrs.end())
-            std::cout << a[i] << " is an abbreviation: " << ab->second << "\n";
-        else
-            std::cout << a[i] << " is an external command\n";
     }
-    return 0;
+    int status = 0;
+    for (size_t i = first; i < a.size(); ++i) {
+        const auto &name = a[i];
+        auto alias = st.aliases.find(name);
+        auto abbreviation = st.abbrs.find(name);
+        const bool builtin = is_parent_builtin(name) || name == "echo" || name == "pwd" ||
+                             name == "true" || name == "false" || name == ":" || name == "type" ||
+                             name == "which" || name == "help" || name == "version" ||
+                             name == "env" || name == "printenv";
+        if (alias != st.aliases.end())
+            std::cout << name << " is an alias: " << alias->second << '\n';
+        else if (abbreviation != st.abbrs.end())
+            std::cout << name << " is an abbreviation: " << abbreviation->second << '\n';
+        else if (builtin)
+            std::cout << name << " is a shell builtin\n";
+        else if (auto path = find_executable(name)) {
+            if (a[0] == "which")
+                std::cout << *path << '\n';
+            else
+                std::cout << name << " is " << *path << '\n';
+        } else {
+            std::cerr << "nash: " << name << ": not found\n";
+            status = 1;
+        }
+    }
+    return status;
 }
 
 int bi_env(const std::vector<std::string> &, ShellState &) {
@@ -447,64 +491,171 @@ int bi_env(const std::vector<std::string> &, ShellState &) {
     return 0;
 }
 
-// read [-p PROMPT] NAME...  — read one line from stdin (fish/bash-like).
-// One name: whole line. Several: split on whitespace, last gets the rest.
-int bi_read(const std::vector<std::string> &a, ShellState &st) {
-    std::string prompt;
-    size_t i = 1;
-    if (i < a.size() && a[i] == "-p" && i + 1 < a.size()) {
-        prompt = a[++i];
-        ++i;
+namespace {
+volatile sig_atomic_t read_interrupted = 0;
+void interrupt_read(int) { read_interrupted = 1; }
+struct ReadSignal {
+    struct sigaction previous {};
+    bool installed = false;
+    explicit ReadSignal(bool interactive) {
+        read_interrupted = 0;
+        if (interactive) {
+            struct sigaction action {};
+            action.sa_handler = interrupt_read;
+            sigemptyset(&action.sa_mask);
+            installed = sigaction(SIGINT, &action, &previous) == 0;
+        }
     }
-    if (i >= a.size()) {
-        std::cerr << "usage: read [-p PROMPT] NAME...\n";
+    ~ReadSignal() {
+        if (installed)
+            sigaction(SIGINT, &previous, nullptr);
+    }
+};
+} // namespace
+// Read stdin directly so buffering/EOF from one redirected command cannot poison the next.
+int bi_read(const std::vector<std::string> &a, ShellState &st) {
+    size_t first = 1;
+    bool raw = false;
+    std::string prompt;
+    while (first < a.size()) {
+        if (a[first] == "--") {
+            ++first;
+            break;
+        }
+        if (a[first] == "-r") {
+            raw = true;
+            ++first;
+            continue;
+        }
+        if (a[first] == "-p" && first + 1 < a.size()) {
+            prompt = a[first + 1];
+            first += 2;
+            continue;
+        }
+        break;
+    }
+    if (first >= a.size()) {
+        std::cerr << "usage: read [-r] [-p PROMPT] NAME...\n";
         return 2;
     }
+    for (size_t i = first; i < a.size(); ++i)
+        if (!is_valid_name(a[i])) {
+            std::cerr << "nash: read: invalid variable name: " << a[i] << '\n';
+            return 2;
+        }
+    ReadSignal signals(st.interactive);
     if (!prompt.empty()) {
         std::cerr << prompt;
         std::cerr.flush();
-    } // stderr, like bash
+    }
     std::string line;
-    if (!std::getline(std::cin, line)) {
-        for (size_t k = i; k < a.size(); ++k)
-            st.set_var(a[k], "", true);
-        return 1; // EOF
-    }
-    auto issp = [](char c) { return std::isspace((unsigned char)c) != 0; };
-    size_t pos = 0;
-    for (size_t k = i; k < a.size(); ++k) {
-        std::string val;
-        if (a.size() == i + 1) {
-            val = line; // single name: whole line, no splitting
-        } else if (k == a.size() - 1) {
-            while (pos < line.size() && issp(line[pos]))
-                ++pos;
-            val = line.substr(pos); // last name gets the remainder
-        } else {
-            while (pos < line.size() && issp(line[pos]))
-                ++pos;
-            size_t s = pos;
-            while (pos < line.size() && !issp(line[pos]))
-                ++pos;
-            val = line.substr(s, pos - s);
+    std::vector<bool> protected_chars;
+    bool newline = false, escape = false;
+    while (!read_interrupted) {
+        char c;
+        const auto n = ::read(STDIN_FILENO, &c, 1);
+        if (n < 0) {
+            if (errno == EINTR)
+                continue;
+            std::cerr << "nash: read: " << strerror(errno) << '\n';
+            return 1;
         }
-        st.set_var(a[k], val, true);
+        if (n == 0)
+            break;
+        if (escape) {
+            escape = false;
+            if (c == '\n')
+                continue;
+            line += c;
+            protected_chars.push_back(true);
+            continue;
+        }
+        if (!raw && c == '\\') {
+            escape = true;
+            continue;
+        }
+        if (c == '\n') {
+            newline = true;
+            break;
+        }
+        line += c;
+        protected_chars.push_back(false);
     }
-    st.last_status = 0;
-    return 0;
+    if (read_interrupted) {
+        if (st.interactive)
+            std::cout << '\n';
+        return 130;
+    }
+    const auto ifs = st.get("IFS", " \t\n");
+    auto separator = [&](size_t p) {
+        return p < line.size() && !protected_chars[p] && ifs.find(line[p]) != std::string::npos;
+    };
+    auto whitespace = [&](size_t p) {
+        return separator(p) && (line[p] == ' ' || line[p] == '\t' || line[p] == '\n');
+    };
+    size_t pos = 0;
+    for (size_t i = first; i < a.size(); ++i) {
+        while (whitespace(pos))
+            ++pos;
+        const auto start = pos;
+        if (i + 1 == a.size()) {
+            size_t end = line.size();
+            while (end > start && whitespace(end - 1))
+                --end;
+            st.set_var(a[i], line.substr(start, end - start), getenv(a[i].c_str()) != nullptr);
+            pos = line.size();
+        } else {
+            while (pos < line.size() && !separator(pos))
+                ++pos;
+            st.set_var(a[i], line.substr(start, pos - start), getenv(a[i].c_str()) != nullptr);
+            if (whitespace(pos)) {
+                while (whitespace(pos))
+                    ++pos;
+                if (separator(pos))
+                    ++pos;
+            } else if (separator(pos))
+                ++pos;
+            while (whitespace(pos))
+                ++pos;
+        }
+    }
+    return newline ? 0 : 1;
 }
 
 // wait — block until every background job started with `&` has finished
 int bi_wait(const std::vector<std::string> &a, ShellState &st) {
     reap_jobs(st);
     int result = 0;
-    for (auto &job : st.bg_jobs) {
-        if (a.size() > 1 && a[1] != std::to_string(job.pid))
-            continue;
-        result = job.reaped ? job.status : wait_for_job(job, st, false);
+    if (a.size() == 1) {
+        for (auto &job : st.bg_jobs)
+            result = job.reaped ? job.status : wait_for_job(job, st, false);
+        return result;
+    }
+    for (size_t i = 1; i < a.size(); ++i) {
+        std::string text = a[i];
+        const bool index = text.starts_with('%');
+        if (index)
+            text.erase(0, 1);
+        char *end = nullptr;
+        errno = 0;
+        long id = strtol(text.c_str(), &end, 10);
+        if (text.empty() || end != text.c_str() + text.size() || errno || id <= 0) {
+            std::cerr << "nash: wait: invalid job: " << a[i] << '\n';
+            return 2;
+        }
+        ShellState::BgJob *selected = nullptr;
+        for (size_t j = 0; j < st.bg_jobs.size(); ++j)
+            if ((index && static_cast<long>(j + 1) == id) || (!index && st.bg_jobs[j].pid == id))
+                selected = &st.bg_jobs[j];
+        if (!selected) {
+            std::cerr << "nash: wait: not a child job: " << a[i] << '\n';
+            result = 127;
+        } else
+            result = selected->reaped ? selected->status : wait_for_job(*selected, st, false);
     }
     return result;
 }
+
 int bi_jobs(const std::vector<std::string> &, ShellState &st) {
     reap_jobs(st);
     for (size_t i = 0; i < st.bg_jobs.size(); ++i) {

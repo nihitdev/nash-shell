@@ -1,8 +1,9 @@
-// expand.cpp
+// Quote-aware expansion: preserve literal/quoted fragments until splitting and globbing.
 #include "expand.h"
-#include "executor.h" // run_jobs
-#include "lexer.h"    // lex
-#include "parser.h"   // parse, JobList
+#include "integrations.h"
+#include "lexer.h"
+#include "shell.h"
+#include <algorithm>
 #include <cctype>
 #include <cerrno>
 #include <cstdlib>
@@ -12,124 +13,123 @@
 #include <stdexcept>
 #include <sys/wait.h>
 #include <unistd.h>
-
 namespace ang {
-
 namespace {
-int g_cs_depth = 0; // command-substitution recursion guard
-}
-
-// Run `inner` as a command (captured stdout) — implements $(...).
-// Runs in a forked grandchild so inner state changes never leak out.
-static std::string run_captured(const std::string &inner, ShellState &st) {
-    if (++g_cs_depth > 8) {
-        --g_cs_depth;
-        return "";
+// Keep $$ stable across forked substitutions, as an identity of the invoking shell.
+const pid_t shell_identity = getpid();
+int substitution_depth = 0;
+struct SubstitutionDepth {
+    SubstitutionDepth() {
+        if (substitution_depth >= 8)
+            throw std::runtime_error("command substitution nesting limit exceeded");
+        ++substitution_depth;
     }
-    std::string out;
-    std::string lerr;
-    auto toks = lex(inner, &lerr);
-    if (lerr.empty() && !toks.empty()) {
-        JobList jobs;
-        std::string perr;
-        if (parse(toks, st.posix, &jobs, &perr)) {
-            int pipefd[2] = {-1, -1};
-            if (pipe(pipefd) == 0) {
-                std::cout.flush();
-                std::cerr.flush();
-                fflush(nullptr);
-                pid_t pid = fork();
-                if (pid == 0) {
-                    close(pipefd[0]);
-                    dup2(pipefd[1], STDOUT_FILENO);
-                    close(pipefd[1]);
-                    signal(SIGINT, SIG_DFL);
-                    st.interactive = false;
-                    st.execution_pgid = getpgrp();
-                    st.bg_jobs.clear();
-                    int rc = run_jobs(jobs, st);
-                    std::cout.flush();
-                    std::cerr.flush();
-                    fflush(nullptr);
-                    _exit(rc);
-                }
-                close(pipefd[1]);
-                char buf[4096];
-                ssize_t n = 0;
-                while ((n = read(pipefd[0], buf, sizeof buf)) != 0) {
-                    if (n < 0) {
-                        if (errno == EINTR)
-                            continue;
-                        break;
-                    }
-                    out.append(buf, (size_t)n);
-                }
-                close(pipefd[0]);
-                int ws = 0;
-                while (waitpid(pid, &ws, 0) < 0 && errno == EINTR) {
-                }
-            }
+    ~SubstitutionDepth() { --substitution_depth; }
+};
+std::string run_captured(const std::string &source, ShellState &st) {
+    SubstitutionDepth depth;
+    int pipes[2];
+    if (pipe(pipes) < 0)
+        throw std::runtime_error("command substitution: pipe failed");
+    UniqueFd reader(pipes[0]), writer(pipes[1]);
+    std::cout.flush();
+    std::cerr.flush();
+    fflush(nullptr);
+    pid_t pid = fork();
+    if (pid < 0)
+        throw std::runtime_error("command substitution: fork failed");
+    if (!pid) {
+        close(reader.release());
+        if (dup2(writer.get(), STDOUT_FILENO) < 0)
+            _exit(125);
+        close(writer.release());
+        for (int sig : {SIGINT, SIGQUIT, SIGTSTP, SIGTTIN, SIGTTOU, SIGPIPE, SIGCHLD})
+            signal(sig, SIG_DFL);
+        st.interactive = false;
+        st.execution_pgid = getpgrp();
+        st.bg_jobs.clear();
+        const int rc = run_source(source, st);
+        std::cout.flush();
+        std::cerr.flush();
+        fflush(nullptr);
+        _exit(rc);
+    }
+    close(writer.release());
+    std::string output;
+    char buffer[4096];
+    while (true) {
+        const auto count = read(reader.get(), buffer, sizeof(buffer));
+        if (count == 0)
+            break;
+        if (count < 0) {
+            if (errno == EINTR)
+                continue;
+            break;
         }
+        output.append(buffer, static_cast<size_t>(count));
     }
-    --g_cs_depth;
-    // strip trailing newlines, like real shells do
-    while (!out.empty() && out.back() == '\n')
-        out.pop_back();
-    return out;
+    int ws = 0;
+    pid_t result;
+    do {
+        result = waitpid(pid, &ws, 0);
+    } while (result < 0 && errno == EINTR);
+    if (result < 0)
+        throw std::runtime_error("command substitution: wait failed");
+    st.substitution_status = WIFEXITED(ws) ? WEXITSTATUS(ws) : 128 + WTERMSIG(ws);
+    if (output.find('\0') != std::string::npos) {
+        std::erase(output, '\0');
+        std::cerr << "nash: command substitution: ignored null byte in output\n";
+    }
+    while (!output.empty() && output.back() == '\n')
+        output.pop_back();
+    return output;
 }
-
-static std::string var_value(const std::string &name, ShellState &st) {
+std::string variable(const std::string &name, const ShellState &st) {
     if (name == "?")
         return std::to_string(st.last_status);
     if (name == "$")
-        return std::to_string(getpid());
+        return std::to_string(shell_identity);
     if (name == "!")
-        return std::to_string(st.last_bg_pid);
-    auto it = st.vars.find(name);
-    if (it != st.vars.end())
-        return it->second;
-    const char *e = std::getenv(name.c_str());
-    return e ? e : "";
+        return st.last_bg_pid ? std::to_string(st.last_bg_pid) : "";
+    return st.get(name);
 }
-
-std::vector<std::string> expand_word(const std::string &raw, ShellState &st, bool split) {
-    struct Field {
-        std::string text, pattern;
-        bool keep = false;
-    };
-    std::vector<Field> fields(1);
+struct Atom {
+    char c = 0;
+    bool quoted = false;
+    bool split = false;
+    bool empty = false;
+};
+using Atoms = std::vector<Atom>;
+Atoms expand_atoms(const std::string &raw, ShellState &st, bool inherited_quote = false,
+                   unsigned depth = 0) {
+    if (depth > 64)
+        throw std::runtime_error("parameter expansion nesting limit exceeded");
+    Atoms out;
     char quote = 0;
-    auto append = [&](char c, bool literal) {
-        fields.back().text += c;
-        if (literal && (c == '*' || c == '?' || c == '[' || c == ']' || c == '\\'))
-            fields.back().pattern += '\\';
-        fields.back().pattern += c;
-        fields.back().keep = true;
+    auto append = [&](char c, bool quoted, bool split = false) {
+        out.push_back({c, quoted, split, false});
     };
-    auto value = [&](const std::string &v) {
-        for (char c : v) {
-            if (split && !quote && (c == ' ' || c == '\t' || c == '\n')) {
-                if (fields.back().keep)
-                    fields.emplace_back();
-            } else
-                append(c, quote != 0);
-        }
+    auto value = [&](const std::string &text, bool quoted) {
+        for (char c : text)
+            append(c, quoted, true);
     };
     for (size_t i = 0; i < raw.size();) {
-        char c = raw[i++];
-        if (c == '\'' && quote != '"') {
+        const char c = raw[i++];
+        const bool quoted = inherited_quote || quote != 0;
+        if (c == '\'' && quote != '"' && !inherited_quote) {
             quote = quote ? 0 : '\'';
-            fields.back().keep = true;
+            out.push_back({0, true, false, true});
             continue;
         }
         if (c == '"' && quote != '\'') {
             quote = quote ? 0 : '"';
-            fields.back().keep = true;
+            out.push_back({0, true, false, true});
             continue;
         }
         if (c == '\\' && quote != '\'' && i < raw.size()) {
-            char next = raw[i];
-            if (quote == '"' && std::string("$`\"\\\n").find(next) == std::string::npos)
+            const char next = raw[i];
+            if ((quote == '"' || inherited_quote) &&
+                std::string("$`\"\\\n").find(next) == std::string::npos)
                 append(c, true);
             else {
                 ++i;
@@ -138,86 +138,117 @@ std::vector<std::string> expand_word(const std::string &raw, ShellState &st, boo
             }
             continue;
         }
-        if (c == '~' && i == 1 && !quote && (i == raw.size() || raw[i] == '/')) {
-            value(home_dir());
+        if (c == '~' && i == 1 && !quoted && (i == raw.size() || raw[i] == '/')) {
+            value(home_dir(), true);
             continue;
         }
+        if (c == '`' && quote != '\'')
+            throw std::runtime_error("backtick substitution is unsupported; use $(...)");
         if (c != '$' || quote == '\'') {
-            append(c, quote != 0);
+            append(c, quoted);
             continue;
         }
         if (i < raw.size() && raw[i] == '(') {
-            size_t begin = ++i;
-            int depth = 1;
-            char q = 0;
-            for (; i < raw.size(); ++i) {
-                char x = raw[i];
-                if (x == '\\' && q != '\'') {
-                    ++i;
-                    continue;
-                }
-                if ((x == '\'' || x == '"') && (!q || q == x)) {
-                    q = q ? 0 : x;
-                    continue;
-                }
-                if (!q && x == '(')
-                    ++depth;
-                if (!q && x == ')' && --depth == 0)
-                    break;
-            }
-            if (depth)
-                throw std::runtime_error("unterminated substitution");
-            value(run_captured(raw.substr(begin, i - begin), st));
-            ++i;
+            const auto end = scan_command_substitution(raw, i - 1);
+            value(run_captured(raw.substr(i + 1, end - i - 2), st), quoted);
+            i = end;
             continue;
         }
-        std::string key;
         if (i < raw.size() && raw[i] == '{') {
-            auto end = raw.find('}', ++i);
-            if (end == std::string::npos)
-                throw std::runtime_error("unterminated parameter expansion");
-            key = raw.substr(i, end - i);
-            i = end + 1;
-            auto op = key.find(":-");
-            if (op != std::string::npos) {
-                auto v = var_value(key.substr(0, op), st);
-                value(v.empty() ? key.substr(op + 2) : v);
-                continue;
-            }
-            if (key.find_first_not_of(
+            const auto end = scan_parameter_expansion(raw, i - 1);
+            const auto expression = raw.substr(i + 1, end - i - 2);
+            const auto op = expression.find(":-");
+            const auto name = expression.substr(0, op);
+            if (name.empty() ||
+                name.find_first_not_of(
                     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789?@*$#!") !=
-                std::string::npos)
+                    std::string::npos)
                 throw std::runtime_error("unsupported parameter expansion");
-        } else if (i < raw.size() &&
-                   std::string("?$#!@*0123456789").find(raw[i]) != std::string::npos)
-            key += raw[i++];
-        else {
+            const auto existing = variable(name, st);
+            if (op != std::string::npos && existing.empty()) {
+                auto fallback = expand_atoms(expression.substr(op + 2), st, quoted, depth + 1);
+                for (auto atom : fallback) {
+                    atom.quoted = atom.quoted || quoted;
+                    atom.split = true;
+                    out.push_back(atom);
+                }
+            } else
+                value(existing, quoted);
+            i = end;
+            continue;
+        }
+        std::string name;
+        if (i < raw.size() && std::string("?$#!@*0123456789").find(raw[i]) != std::string::npos)
+            name += raw[i++];
+        else
             while (i < raw.size() &&
                    (std::isalnum(static_cast<unsigned char>(raw[i])) || raw[i] == '_'))
-                key += raw[i++];
-        }
-        if (key.empty())
-            append('$', true);
+                name += raw[i++];
+        if (name.empty())
+            append('$', quoted);
         else
-            value(var_value(key, st));
+            value(variable(name, st), quoted);
+    }
+    if (quote)
+        throw std::runtime_error("unterminated quote in expansion");
+    return out;
+}
+} // namespace
+std::vector<std::string> expand_word(const std::string &raw, ShellState &st, bool split) {
+    struct Field {
+        std::string text, pattern;
+        bool keep = false;
+    };
+    std::vector<Field> fields(1);
+    const auto ifs = st.get("IFS", " \t\n");
+    bool after_whitespace = false;
+    for (const auto &atom : expand_atoms(raw, st)) {
+        if (atom.empty) {
+            fields.back().keep = true;
+            after_whitespace = false;
+            continue;
+        }
+        if (split && atom.split && !atom.quoted && ifs.find(atom.c) != std::string::npos) {
+            const bool whitespace = atom.c == ' ' || atom.c == '\t' || atom.c == '\n';
+            if (whitespace) {
+                if (fields.back().keep) {
+                    fields.emplace_back();
+                    after_whitespace = true;
+                }
+            } else {
+                if (!after_whitespace) {
+                    fields.back().keep = true;
+                    fields.emplace_back();
+                }
+                after_whitespace = false;
+            }
+            continue;
+        }
+        after_whitespace = false;
+        auto &field = fields.back();
+        field.keep = true;
+        field.text += atom.c;
+        if (atom.quoted && std::string("*?[]\\").find(atom.c) != std::string::npos)
+            field.pattern += '\\';
+        field.pattern += atom.c;
     }
     std::vector<std::string> out;
-    for (auto &f : fields) {
-        if (!f.keep && split)
+    for (const auto &field : fields) {
+        if (!field.keep && split)
             continue;
-        if (split && f.pattern.find_first_of("*?[") != std::string::npos) {
+        if (split && field.pattern.find_first_of("*?[") != std::string::npos) {
             glob_t matches{};
-            int result = glob(f.pattern.c_str(), 0, nullptr, &matches);
-            if (result == 0)
+            const int rc = glob(field.pattern.c_str(), 0, nullptr, &matches);
+            if (rc == 0)
                 for (size_t i = 0; i < matches.gl_pathc; ++i)
                     out.emplace_back(matches.gl_pathv[i]);
             globfree(&matches);
-            if (result == 0)
+            if (rc == 0)
                 continue;
-            if (result != GLOB_NOMATCH)
+            if (rc != GLOB_NOMATCH)
                 throw std::runtime_error("filename expansion failed");
         }
-        out.push_back(f.text);
+        out.push_back(field.text);
     }
     return out;
 }

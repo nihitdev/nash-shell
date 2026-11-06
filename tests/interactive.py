@@ -54,6 +54,15 @@ class TerminalTests(unittest.TestCase):
         self.send(b'echo after-banner\r')
         output=self.until(b'\r\nafter-banner\r\n')+self.until_prompt()
         self.assertNotIn(b'fastfetch-startup-fixture',output)
+    def test_exit_too_many_arguments_keeps_interactive_shell(self):
+        self.send(b'exit 1 2\r');self.until(b'too many arguments');self.until_prompt()
+        self.command(b'echo $?',b'1')
+    def test_builtin_read_interrupt(self):
+        self.send(b'read -p "$(printf audit-%s ready)" X\r');self.until(b'audit-ready');self.send(b'\x03');self.until_prompt(3)
+        self.command(b'echo $?',b'130')
+        self.command(b'echo recovered',b'recovered')
+    def test_completion_at_input_start(self):
+        self.command(b'echo stable\x01\t\x05',b'stable')
     def test_edit_and_unicode(self):
         self.command(b'echo abX\x1b[D\x7fc',b'acX')
         self.command('echo café\x7f'.encode(),b'caf')

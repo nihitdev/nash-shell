@@ -12,7 +12,7 @@ New to Nash? Read these in order:
 Start with the commented [example config.nash](../examples/config.nash). It uses the same Nash
 commands you can run interactively. No TOML is required for new Nash configurations.
 
-For contributors: [architecture](ARCHITECTURE.md), [tests](TESTING.md),
+For contributors: [architecture](ARCHITECTURE.md), [tests](TESTING.md), [command reliability audit](RELIABILITY.md),
 [integration contracts](INTEGRATIONS.md), [benchmarks](BENCHMARKS.md),
 [provenance](ATTRIBUTION.md) and [contributing](../CONTRIBUTING.md).
 

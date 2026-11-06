@@ -4,6 +4,7 @@
 #include "lexer.h"
 #include "parser.h"
 #include "util.h"
+#include <algorithm>
 #include <cerrno>
 #include <filesystem>
 #include <iostream>
@@ -37,7 +38,13 @@ int run_source(const std::string &raw, ang::ShellState &st) {
 // Single physical line: expand, lex, parse, run.
 int run_chunk(const std::string &raw, ang::ShellState &st) {
     bool skip = false;
-    std::string s = ang::preprocess(raw, st, &skip);
+    std::string s;
+    try {
+        s = ang::preprocess(raw, st, &skip);
+    } catch (const std::exception &e) {
+        std::cerr << "nash: " << e.what() << '\n';
+        return st.last_status = 2;
+    }
     if (skip)
         return st.last_status;
     if (ang::trim(s).empty())
@@ -151,6 +158,29 @@ int wait_for_job(ShellState::BgJob &job, ShellState &st, bool foreground) {
             if (errno == EINTR)
                 continue;
             break;
+        }
+        // Substitution children may share a process group with background jobs.
+        // A group wait can reap those too; never count them as this job's children.
+        if (std::find(job.pids.begin(), job.pids.end(), pid) == job.pids.end()) {
+            for (auto &background : st.bg_jobs) {
+                if (std::find(background.pids.begin(), background.pids.end(), pid) ==
+                    background.pids.end())
+                    continue;
+                if (WIFSTOPPED(ws))
+                    background.stopped_pids.insert(pid);
+                else {
+                    background.results[pid] = ws;
+                    background.stopped_pids.erase(pid);
+                }
+                background.stopped = !background.stopped_pids.empty() &&
+                                     background.stopped_pids.size() + background.results.size() ==
+                                         background.pids.size();
+                background.reaped = background.results.size() == background.pids.size();
+                if (background.reaped)
+                    background.status = decoded(background.results[background.pids.back()]);
+                break;
+            }
+            continue;
         }
         if (WIFSTOPPED(ws))
             job.stopped_pids.insert(pid);

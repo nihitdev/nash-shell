@@ -262,6 +262,9 @@ searchable handbook, tool support directory, and local config builder.
 | [Editing and keybindings](docs/KEYBINDINGS.md) | [Changelog](CHANGELOG.md) |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | [Contributing](CONTRIBUTING.md) |
 
+Read the [command reliability audit](docs/RELIABILITY.md) for reproduced failures, root causes,
+fixes, and the Bash comparison suite.
+
 The [handbook](docs/README.md) is also installed under `share/doc/nash/docs/` beneath your
 installation prefix for offline reading.
 

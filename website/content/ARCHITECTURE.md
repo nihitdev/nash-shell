@@ -4,7 +4,7 @@ Nash retains ang.sh's small-module layout while moving runtime coordination out 
 
 - `main`: CLI, interactive lifecycle, elapsed command timing, prompt and history coordination.
 - `shell`: logical input, shared script/source evaluation, foreground terminal setup and job reaping.
-- `lexer`: token boundaries plus raw word spelling; quotes and substitution bodies survive parsing.
+- `lexer`: token boundaries, original byte ranges and shared bounded delimiter scanning; quote/substitution bodies survive parsing.
 - `parser`: lists of and/or pipelines, commands, assignments and ordered redirections.
 - `expand`: segment-aware quote removal, variables, substitution, field splitting and globbing.
 - `executor`: prepares each command once, parent builtins, RAII descriptor/environment restoration,

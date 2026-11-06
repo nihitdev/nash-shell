@@ -31,9 +31,13 @@ struct Token {
     QuoteKind quote_kind =
         QuoteKind::None; // None = unquoted, Single = '...', Double = "..." / $(...)
     std::string raw;
-    bool had_quotes = false; // word contained literal quote chars
+    size_t begin = 0, end = 0; // byte range in the original source
+    bool had_quotes = false;   // word contained literal quote chars
 };
 
+// Shared scanners return the byte after the closing delimiter and reject incomplete input.
+size_t scan_command_substitution(const std::string &source, size_t dollar, unsigned depth = 0);
+size_t scan_parameter_expansion(const std::string &source, size_t dollar, unsigned depth = 0);
 std::vector<Token> lex(const std::string &line, std::string *err = nullptr);
 
 } // namespace ang

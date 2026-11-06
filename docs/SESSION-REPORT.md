@@ -167,3 +167,27 @@ Desktop/mobile screenshots were visually inspected. The exact manual Vercel buil
 also succeeded in a clean standalone folder using only the retained content snapshot.
 GitHub CI now builds and validates the website as well as the shell. Hosting itself remains
 for the user to perform; no production-host verification is claimed.
+
+## General command reliability audit — 2026-11-06
+
+The user requested a proactive investigation of command failures. Reproduced supported-command
+behavior against clean Bash 5.3.20 and corrected alias tokenization/prefixes/substitutions,
+assignment order and status, nested/default/IFS expansion, shared delimiter scanning,
+escaped trailing spaces, stable shell identity, shared-group child status ownership, stdio descriptor
+prefixes, read buffering/EOF/stdin ownership,
+read interruption and flags, exit/cd/type/env/wait validation, and cursor-zero completion.
+See RELIABILITY.md for individual failures, causes and fixes. Unsupported language features
+remain explicitly unsupported; no full shell-conformance claim is made.
+
+Added a dedicated CTest reliability suite with 15 named tests, including 86 command/expansion
+comparisons and 36 read/IFS comparisons against Bash. Added PTY checks for builtin-read
+interrupt/recovery, completion at the beginning of input, and interactive invalid-exit handling.
+The ordinary execution and documentation suites remain in place.
+
+Debug and Release builds succeeded. Debug CTest passed all five suites in 11.76 s;
+ASan/UBSan CTest passed all five in 21.38 s. Release reliability tests (15) and execution tests
+(32) passed. The interactive suite contains 29 cases across native and Starship prompts.
+Formatting, Python syntax, and diff-whitespace checks passed. The documentation website now
+has a reliability-audit page (32 pages total); generated links, anchors, assets and 14 search
+entries validate. No hosting deployment command/API was invoked. Global installation requires the
+user's sudo password; `build-release/nash` contains the tested fixes until reinstallation.
