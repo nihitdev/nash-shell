@@ -213,6 +213,21 @@ for an external executable silently.
 The [popular tools guide](docs/TOOLS.md) walks through setup, working examples, Fastfetch's own
 configuration, and what still needs a native adapter.
 
+## Create a folder and jump into it
+
+Nash includes `take`, a small shortcut for creating nested directories and entering them:
+
+```sh
+take ~/Projects/new-app/src
+pwd
+# /home/you/Projects/new-app/src
+```
+
+`take DIRECTORY` creates any missing parent directories and then changes to the
+destination, even if it already exists. It updates `PWD` and `OLDPWD` and runs the
+same directory-change hook as `cd`. Use quotes for paths with spaces. Creation
+or navigation errors return a nonzero status and do not change the working directory.
+
 ## Learn the essentials
 
 ```sh
