@@ -222,3 +222,26 @@ all six in 28.25 s. The Release build passed all 33 PTY tests and all 15 reliabi
 (including 122 Bash comparisons). Formatting and whitespace checks passed. Both the current
 installed Nash and rebuilt Release binary loaded the personal config and rendered Nebula.
 The website build/link/anchor/asset/search checks passed for 32 pages and 14 search entries.
+
+## Gray autosuggestion follow-up — 2026-11-06
+
+The user clarified that the requested feature was gray inline ghost text rather than Tab
+completion. Added a separate append-only suggestion provider: recent matching history wins;
+after 80 ms of idle typing, unmatched input can predict command, filename, directory, Git
+subcommand and variable suffixes using local completion. External Git lookup is disabled on
+this path. Predictions are cached for the current input; bare argument separators and leading
+private spaces do not generate fallback suggestions. Fuzzy rewrites remain explicit Tab actions.
+Right Arrow/Ctrl-F accepts gray text; Enter alone does not accept it.
+
+Added unit regressions for priority, fresh-path predictions, disabled/private suggestions,
+variables, escaping and append-only behavior. PTY cases wait for an untyped filename suffix,
+inspect gray ANSI styling, accept with Right Arrow, verify Enter does not accept the suffix,
+and cancel with Ctrl-C in native and Starship sessions. The color test explicitly unsets
+NO_COLOR within its isolated shell; user environment settings are unchanged.
+
+Verification: Debug CTest passed all six suites in 12.54 s; ASan/UBSan passed all six in
+24.43 s, followed by both focused gray acceptance/Enter tests after their final assertion
+was added. Release passed all 37 PTY tests, all 15 reliability tests and the two focused
+gray acceptance/Enter checks. Formatting and whitespace checks passed. Website generation
+and link/anchor/asset/search validation passed for 32 pages and 14 search entries. No website
+deployment or global binary installation was performed; installation still requires sudo.

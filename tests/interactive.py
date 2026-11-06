@@ -25,7 +25,7 @@ class TerminalTests(unittest.TestCase):
             os.environ.update(PATH=str(self.root)+':'+os.environ['PATH'],NASH_PROMPT_LOG=str(self.root/'prompt-log'),XDG_CONFIG_HOME=str(self.root),XDG_DATA_HOME=str(self.root),TERM='xterm-256color')
             os.execv(NASH,[NASH])
         fcntl.ioctl(self.fd,termios.TIOCSWINSZ,struct.pack('HHHH',24,100,0,0))
-        self.pending=b'';self.initial_output=self.until_prompt()
+        self.pending=b'';self.raw_output=b'';self.initial_output=self.until_prompt()
     def tearDown(self):
         try:os.kill(self.pid,signal.SIGKILL)
         except ProcessLookupError:pass
@@ -39,7 +39,9 @@ class TerminalTests(unittest.TestCase):
                 out=self.pending[:pos+len(needle)];self.pending=self.pending[pos+len(needle):];return out
             if select.select([self.fd],[],[],0.05)[0]:
                 try:
-                    self.pending+=os.read(self.fd,65536)
+                    chunk=os.read(self.fd,65536)
+                    self.raw_output+=chunk
+                    self.pending+=chunk
                     self.pending=self.pending.replace(b'\x1b[?2004h',b'\x00PROMPT\x00')
                     self.pending=re.sub(rb'\x1b\[[0-?]*[ -/]*[@-~]',b'',self.pending)
                     self.pending=self.pending.replace(b'\r\r\n',b'\r\n')
@@ -71,6 +73,23 @@ class TerminalTests(unittest.TestCase):
         self.command(b'echo hist\x1b[C',b'history-marker')
         self.command(b'\x12',b'history-marker')
         self.assertTrue((self.root/'nash/history').exists())
+    def test_ghost_suggestions_without_history(self):
+        (self.root/'ghost-new-file').write_text('fresh-ghost-file\n')
+        base=str(self.root).encode()+b'/'
+        self.command(b'unset NO_COLOR; config set colors.enabled true; echo ghost-colors',b'ghost-colors')
+        self.send(b'cat '+base+b'ghost-new-f')
+        # Wait for the actual idle-generated suffix, without a Tab key or matching history.
+        self.until(b'ghost-new-file')
+        self.assertIn(b'\x1b[90mile\x1b[0m',self.raw_output)
+        self.command(b'\x1b[C', b'fresh-ghost-file')
+        self.command(b'echo ghost-typed-only', b'ghost-typed-only')
+        self.command(b'echo ghost-typed', b'ghost-typed')
+    def test_ghost_suggestion_dismissal(self):
+        (self.root/'ghost-cancel-file').write_text('must-not-run\n')
+        self.send(b'cat '+str(self.root).encode()+b'/ghost-cancel-f')
+        self.until(b'ghost-cancel-file')
+        self.send(b'\x03');self.until_prompt()
+        self.command(b'echo ghost-dismissed',b'ghost-dismissed')
     def test_interrupt_and_foreground(self):
         self.send(b'sleep 10\r');time.sleep(.2);self.send(b'\x03');self.until_prompt(3)
         self.command(b'echo $?',b'130')

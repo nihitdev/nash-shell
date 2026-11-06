@@ -51,7 +51,8 @@ int rank(const std::string &name, const std::string &prefix) {
     return 2;
 }
 } // namespace
-Completion complete_line(const std::string &line, size_t cursor, const ShellState &st) {
+Completion complete_line(const std::string &line, size_t cursor, const ShellState &st,
+                         bool query_git) {
     cursor = std::min(cursor, line.size());
     Completion result{cursor, cursor, {}};
     std::vector<Word> words;
@@ -241,7 +242,11 @@ Completion complete_line(const std::string &line, size_t cursor, const ShellStat
                         args.push_back("refs/remotes");
                         args.push_back("refs/tags");
                     }
-                    auto refs = capture_tool(args, 200);
+                    if (sub == "switch" || sub == "merge" || sub == "rebase")
+                        found.clear();
+                    ToolResult refs;
+                    if (query_git)
+                        refs = capture_tool(args, 200);
                     if (refs.status == 0) {
                         if (sub == "switch" || sub == "merge" || sub == "rebase")
                             found.clear();

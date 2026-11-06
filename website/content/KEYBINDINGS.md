@@ -5,7 +5,7 @@
 | Tab | complete or extend a shared prefix; repeat to cycle through candidates |
 | Shift-Tab | cycle backward through completion candidates |
 | Up / Down | navigate session and loaded history |
-| Right at end / Ctrl-F | accept the current history suggestion |
+| Right at end / Ctrl-F | accept the current gray autosuggestion |
 | Left / Right | move by UTF-8 codepoint |
 | Ctrl-R | search older history by substring; repeat for older matches |
 | Ctrl-A / Home | beginning of input |
@@ -19,7 +19,20 @@
 | Ctrl-D | exit on empty input; otherwise delete next codepoint |
 | Ctrl-Z | stop foreground external work |
 
-History suggestions appear after a matching prefix. Colors distinguish valid commands,
+Gray autosuggestions appear inline as you type, without pressing Tab. Recent matching history
+has priority. With no history match, an 80 ms typing pause enables append-only predictions from
+commands, filenames, directories, Git subcommands and variable names. This fallback uses the
+local completion engine with external Git lookup disabled: no program runs on each keystroke.
+For example, `cat REA` can show gray `DME.md` even before that command enters history.
+
+Press Right Arrow at the end of input or Ctrl-F to accept the full gray suffix; Enter executes
+only the text you have accepted or typed. Editing dismisses/recomputes the prediction. Leading
+space suppresses predictions, and `config set autosuggestions.enabled false` disables them.
+No arguments are invented after a bare separating space. Ghost text only appends: fuzzy/case
+rewrites and open-quote replacements remain explicit Tab operations. New Git branch predictions
+require Tab; history can still suggest a previous full Git command.
+
+ Colors distinguish valid commands,
 missing commands, quoted strings, operators and variables. A red command can still be a
 runtime-expanded command; validation is a simple PATH/builtin/alias check.
 

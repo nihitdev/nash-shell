@@ -8,5 +8,6 @@ struct Completion {
     std::vector<std::string> candidates; // Safely escaped replacement words, ranked best first.
 };
 // Never evaluates shell source. Cursor and replacement ranges are byte offsets.
-Completion complete_line(const std::string &line, size_t cursor, const ShellState &st);
+Completion complete_line(const std::string &line, size_t cursor, const ShellState &st,
+                         bool query_git = true);
 } // namespace ang

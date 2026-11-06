@@ -38,3 +38,8 @@ ranges, Git subcommands/aliases, and the guarantee that substitutions are never 
 It also checks theme newline decoding. PTY regressions cover actual Tab/Shift-Tab cycling,
 quoted and fuzzy file completion, and switching to a completed Git branch under native and
 Starship prompts.
+
+Ghost-text regressions verify history priority, fresh filesystem/command/variable predictions,
+append-only behavior, private leading-space suppression and disabled suggestions. PTY tests wait
+for a newly discovered filename suffix without sending Tab, inspect its gray ANSI styling,
+accept it with Right Arrow, and exercise Ctrl-C dismissal under native and Starship prompts.

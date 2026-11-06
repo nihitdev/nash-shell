@@ -15,6 +15,8 @@ Nash retains ang.sh's small-module layout while moving runtime coordination out 
   candidate-menu rendering, history suggestions and search.
 - `completion`: literal-word context, safely escaped replacements, ranked prefix/fuzzy candidates,
   directory/executable filtering, variables, simple alias context and bounded local Git ref lookup.
+- `suggestion`: recent-history-first append-only ghost text, with idle-debounced local completion fallback
+  and external queries disabled; predictions are cached within the current edit.
 - `prompt`: inherited template renderer, themes, ANSI-aware widths and native fallback.
 
 No command is delegated to `/bin/sh` by Nash. External executables may of course invoke their

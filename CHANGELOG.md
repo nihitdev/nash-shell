@@ -2,6 +2,9 @@
 
 ## 0.2.0 — unreleased
 
+- Extend gray autosuggestions beyond history with idle-debounced command/path/variable predictions;
+  preserve recent history priority, append-only acceptance, and suppress external queries while typing.
+
 - Add Nebula, a custom multiline native theme; decode newline and backslash escapes in theme files.
 - Extract context-aware completion with prefix/case-insensitive/fuzzy ranking, safe quoted filenames,
   directory-only cd, variables, command positions, simple aliases and local Git refs.

@@ -47,7 +47,7 @@ to your existing Starship prompt when you want to.
 | | Available today |
 |---|---|
 | **A working shell** | External commands, pipelines, redirections, variables, quoting, globbing, and command substitution. |
-| **Comfortable editing** | History suggestions, syntax and command highlighting, ranked fuzzy/path/Git Tab completion with candidate cycling, reverse history search, and UTF-8 cursor movement. |
+| **Comfortable editing** | Gray history/command/path autosuggestions, syntax and command highlighting, ranked fuzzy/path/Git Tab completion with candidate cycling, reverse history search, and UTF-8 cursor movement. |
 | **Your own configuration** | Nash commands for settings, aliases, environment variables, startup tools, hooks, and keybindings. |
 | **Two prompt engines** | A native prompt by default; optional Starship with your existing configuration, status, duration, directory, and job context. |
 | **Job control** | Background pipelines, foreground terminal handoff, Ctrl-C, Ctrl-Z, `jobs`, `fg`, `bg`, and `wait`. |
@@ -235,7 +235,7 @@ is substring-based; the history limit bounds memory rather than disk growth.
 | Key | Action |
 |---|---|
 | **Tab** | Complete commands and paths |
-| **Right / Ctrl-F** | Accept a history suggestion at the end of input |
+| **Right / Ctrl-F** | Accept the gray autosuggestion at the end of input |
 | **Up / Down** | Browse history |
 | **Ctrl-R** | Search older history |
 | **Ctrl-A / Ctrl-E** | Move to the beginning / end |

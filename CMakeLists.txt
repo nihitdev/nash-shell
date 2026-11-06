@@ -9,7 +9,7 @@ find_package(tomlplusplus 3 REQUIRED)
 add_library(nash_core
     src/util.cpp src/env.cpp src/lexer.cpp src/expand.cpp src/parser.cpp
     src/executor.cpp src/builtins.cpp src/prompt.cpp src/config.cpp
-    src/editor.cpp src/completion.cpp src/highlight.cpp src/integrations.cpp src/shell.cpp)
+    src/editor.cpp src/completion.cpp src/suggestion.cpp src/highlight.cpp src/integrations.cpp src/shell.cpp)
 target_include_directories(nash_core PUBLIC src)
 target_link_libraries(nash_core PUBLIC tomlplusplus::tomlplusplus)
 target_compile_options(nash_core PRIVATE -Wall -Wextra -Wpedantic)

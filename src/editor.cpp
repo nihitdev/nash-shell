@@ -5,9 +5,11 @@
 #include "integrations.h"
 #include "prompt.h"
 #include "shell.h"
+#include "suggestion.h"
 #include "util.h"
 #include <algorithm>
 #include <cerrno>
+#include <chrono>
 #include <cstring>
 #include <cwchar>
 #include <fcntl.h>
@@ -147,6 +149,9 @@ static std::optional<std::string> edit_line(ShellState &st, const std::string &l
     size_t completion_cursor = 0, completion_index = 0;
     bool cycling = false;
     std::vector<std::string> menu;
+    std::string predicted_buffer, predicted_suffix;
+    auto suggestion_deadline = std::chrono::steady_clock::now();
+    bool prediction_pending = false;
     auto newline = left.rfind('\n');
     auto tail = newline == std::string::npos ? left : left.substr(newline + 1);
     if (newline != std::string::npos)
@@ -157,12 +162,11 @@ static std::optional<std::string> edit_line(ShellState &st, const std::string &l
         ioctl(0, TIOCGWINSZ, &ws);
         int columns = ws.ws_col ? ws.ws_col : 80;
         suggestion.clear();
-        if (menu.empty() && st.suggestions_enabled && !buffer.empty() && cursor == buffer.size())
-            for (auto i = st.history.rbegin(); i != st.history.rend(); ++i)
-                if (i->starts_with(buffer) && i->size() > buffer.size()) {
-                    suggestion = i->substr(buffer.size());
-                    break;
-                }
+        if (menu.empty() && st.suggestions_enabled && !buffer.empty() && cursor == buffer.size()) {
+            suggestion = suggest_suffix(buffer, st);
+            if (suggestion.empty() && predicted_buffer == buffer)
+                suggestion = predicted_suffix;
+        }
         std::string output = "\r";
         if (cursor_row)
             output += "\033[" + std::to_string(cursor_row) + "A";
@@ -212,13 +216,22 @@ static std::optional<std::string> edit_line(ShellState &st, const std::string &l
     bool paste = false;
     while (true) {
         pollfd fd{0, POLLIN, 0};
-        int ready = poll(&fd, 1, 250);
+        int ready = poll(&fd, 1, prediction_pending ? 80 : 250);
         if (ready < 0) {
             if (errno == EINTR)
                 continue;
             return std::nullopt;
         }
         if (!ready) {
+            if (prediction_pending && std::chrono::steady_clock::now() >= suggestion_deadline) {
+                prediction_pending = false;
+                if (menu.empty() && st.suggestions_enabled && !buffer.empty() &&
+                    cursor == buffer.size()) {
+                    predicted_buffer = buffer;
+                    predicted_suffix = suggest_suffix(buffer, st, true);
+                    render();
+                }
+            }
             reap_jobs(st);
             continue;
         }
@@ -263,6 +276,7 @@ static std::optional<std::string> edit_line(ShellState &st, const std::string &l
         }
         if (!key.empty() && key.size() == 1)
             c = key[0];
+        prediction_pending = false;
         const bool tab = key == "\t" || key == "\033[Z";
         if (!tab) {
             menu.clear();
@@ -409,8 +423,13 @@ static std::optional<std::string> edit_line(ShellState &st, const std::string &l
                    (static_cast<unsigned char>(c) >= 32 || (paste && (c == '\n' || c == '\r')))) {
             buffer.insert(cursor++, 1, paste && c == '\r' ? '\n' : c);
         }
-        if (!paste)
+        if (!paste) {
             render();
+            prediction_pending = menu.empty() && st.suggestions_enabled && !buffer.empty() &&
+                                 cursor == buffer.size() && suggestion.empty() &&
+                                 predicted_buffer != buffer;
+            suggestion_deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(80);
+        }
     }
 }
 } // namespace ang

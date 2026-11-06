@@ -1,5 +1,6 @@
 #include "completion.h"
 #include "prompt.h"
+#include "suggestion.h"
 #include <algorithm>
 #include <cstdlib>
 #include <filesystem>
@@ -82,6 +83,23 @@ int main() {
     require(values("git sw") == std::vector<std::string>{"switch"}, "git subcommand");
     st.aliases["g"] = "git";
     require(values("g sw") == std::vector<std::string>{"switch"}, "git alias context");
+    st.history = {"echo older", "echo newer"};
+    require(ang::suggest_suffix("echo ", st) == "newer", "recent history ghost");
+    require(ang::suggest_suffix(" echo ", st, true).empty(), "private leading space");
+    st.history.clear();
+    require(ang::suggest_suffix("cat tw", st).empty(), "no filesystem work before idle");
+    require(ang::suggest_suffix("cat tw", st, true) == "o\\ words", "new filename ghost");
+    require(ang::suggest_suffix("cat two\\ w", st, true) == "ords", "escaped filename ghost");
+    require(ang::suggest_suffix("cd project-", st, true) == "folder/", "directory ghost");
+    require(ang::suggest_suffix("git sw", st, true) == "itch", "git subcommand ghost");
+    require(ang::suggest_suffix("echo $NASH_COMPLETION_T", st, true) == "EST", "variable ghost");
+    require(ang::suggest_suffix("cat fzt", st, true).empty(), "never append fuzzy rewrites");
+    require(ang::suggest_suffix("cat ", st, true).empty(), "do not invent arguments");
+    require(ang::suggest_suffix("cat $(touch marker)", st, true).empty() && !fs::exists("marker"),
+            "no ghost evaluation");
+    st.suggestions_enabled = false;
+    require(ang::suggest_suffix("cat tw", st, true).empty(), "disable ghosts");
+    st.suggestions_enabled = true;
     std::ofstream("theme.conf") << "prompt_left = \"one\\ntwo\\\\three\"\n";
     std::string error;
     require(ang::load_theme("./theme.conf", st, &error) && st.prompt_left == "one\ntwo\\three",
