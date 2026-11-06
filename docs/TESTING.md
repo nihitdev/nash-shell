@@ -31,3 +31,10 @@ The reliability suite adds 86 Bash command/expansion comparisons and 36 read/IFS
 plus focused regression cases. It executes supported syntax in temporary directories and
 avoids personal startup files. See [the audit](RELIABILITY.md) for failures, root causes and
 fixes; passing these cases is not a claim of complete POSIX compliance.
+
+The completion suite uses isolated filesystem fixtures to check ranking, quotes/escapes,
+hidden files, directory filtering, variable names, tilde paths, command positions, replacement
+ranges, Git subcommands/aliases, and the guarantee that substitutions are never executed.
+It also checks theme newline decoding. PTY regressions cover actual Tab/Shift-Tab cycling,
+quoted and fuzzy file completion, and switching to a completed Git branch under native and
+Starship prompts.

@@ -303,6 +303,14 @@ bool load_theme(const std::string &name_or_path, ShellState &st, std::string *er
         std::string v = trim(line.substr(eq + 1));
         if (v.size() >= 2 && v.front() == '"' && v.back() == '"')
             v = v.substr(1, v.size() - 2);
+        std::string decoded;
+        for (size_t i = 0; i < v.size(); ++i) {
+            if (v[i] == '\\' && i + 1 < v.size() && (v[i + 1] == 'n' || v[i + 1] == '\\')) {
+                decoded += v[++i] == 'n' ? '\n' : '\\';
+            } else
+                decoded += v[i];
+        }
+        v = std::move(decoded);
         if (k == "prompt_left")
             st.prompt_left = v;
         else if (k == "prompt_right")
@@ -317,13 +325,15 @@ int bi_theme(const std::vector<std::string> &a, ShellState &st) {
     if (a.size() == 1) {
         // First line stays machine-readable (`theme | head -1`).
         std::cout << st.theme_name << "\n"
-                  << "available: default minimal rice power mono\n";
+                  << "available: default minimal classic modern catppuccin rose-pine tokyo-night "
+                     "gruvbox nord dracula monochrome nebula rice power mono\n";
         return 0;
     }
     std::string err;
     if (!load_theme(a[1], st, &err)) {
         std::cerr << "theme: " << err << "\n"
-                  << "available: default minimal rice power mono\n";
+                  << "available: default minimal classic modern catppuccin rose-pine tokyo-night "
+                     "gruvbox nord dracula monochrome nebula rice power mono\n";
         return 1;
     }
     return 0;

@@ -191,3 +191,34 @@ Formatting, Python syntax, and diff-whitespace checks passed. The documentation 
 has a reliability-audit page (32 pages total); generated links, anchors, assets and 14 search
 entries validate. No hosting deployment command/API was invoked. Global installation requires the
 user's sudo password; `build-release/nash` contains the tested fixes until reinstallation.
+
+## Nebula theme and smarter completion — 2026-11-06
+
+Added Nebula, a personal native theme for nihitdev: blue frame, lavender Nash label, icy-blue
+working directory, Git branch, status-aware second line and right-side clock. Theme files now
+decode newline/backslash escapes. Installed the personal theme under ~/.config/nash/themes and
+selected it in the backed-up config.nash. A literal multiline override preserves appearance on
+the user's older installed binary until the rebuilt binary is installed.
+
+Extracted completion into a separate module. It handles command positions after operators,
+assignment prefixes, directory-only cd, executable paths, quoted/escaped filenames, hidden-file
+filtering, tilde paths and variable names. Exact prefixes win, then case-insensitive prefixes,
+then fuzzy subsequences. Ambiguous completion displays a compact candidate row; Tab/Shift-Tab
+cycle through a cached list. Mid-token replacement preserves following arguments. Git supports
+common subcommands and bounded local ref discovery, including simple aliases; switch suggests
+local branches while checkout/merge/rebase/show can suggest remote refs and tags. After --,
+Git completes paths. No command substitution is evaluated during completion. Directory scans
+are bounded at 20000 entries and displayed candidates at 256; Git capture has a 200 ms deadline.
+
+Added isolated completion/theme unit checks and PTY regressions for quoted/fuzzy filenames,
+forward/backward cycling, middle-of-line editing and completed Git branch switching under
+native and Starship prompts. Git-specific PTY tests skip explicitly if Git is absent.
+Updated handbook, README, CI formatting scope and website snapshots. Full arbitrary tool
+completion scripts, Git options, descriptions and Fish parity are not claimed. Global installation
+still needs the user's sudo password; no login-shell change or hosting deployment was performed.
+
+Verification: final Debug CTest passed all six suites in 17.03 s; final ASan/UBSan CTest passed
+all six in 28.25 s. The Release build passed all 33 PTY tests and all 15 reliability tests
+(including 122 Bash comparisons). Formatting and whitespace checks passed. Both the current
+installed Nash and rebuilt Release binary loaded the personal config and rendered Nebula.
+The website build/link/anchor/asset/search checks passed for 32 pages and 14 search entries.

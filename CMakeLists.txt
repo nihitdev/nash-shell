@@ -9,7 +9,7 @@ find_package(tomlplusplus 3 REQUIRED)
 add_library(nash_core
     src/util.cpp src/env.cpp src/lexer.cpp src/expand.cpp src/parser.cpp
     src/executor.cpp src/builtins.cpp src/prompt.cpp src/config.cpp
-    src/editor.cpp src/highlight.cpp src/integrations.cpp src/shell.cpp)
+    src/editor.cpp src/completion.cpp src/highlight.cpp src/integrations.cpp src/shell.cpp)
 target_include_directories(nash_core PUBLIC src)
 target_link_libraries(nash_core PUBLIC tomlplusplus::tomlplusplus)
 target_compile_options(nash_core PRIVATE -Wall -Wextra -Wpedantic)
@@ -35,6 +35,9 @@ if(BUILD_TESTING)
     add_executable(nash_unit tests/unit.cpp)
     target_link_libraries(nash_unit PRIVATE nash_core)
     add_test(NAME unit COMMAND nash_unit)
+    add_executable(nash_completion_tests tests/completion.cpp)
+    target_link_libraries(nash_completion_tests PRIVATE nash_core)
+    add_test(NAME completion COMMAND nash_completion_tests)
     add_test(NAME execution COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/execution.py $<TARGET_FILE:nash>)
     add_test(NAME interactive COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/interactive.py $<TARGET_FILE:nash>)
     add_test(NAME documentation COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/documentation.py $<TARGET_FILE:nash>)

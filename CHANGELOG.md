@@ -2,6 +2,11 @@
 
 ## 0.2.0 — unreleased
 
+- Add Nebula, a custom multiline native theme; decode newline and backslash escapes in theme files.
+- Extract context-aware completion with prefix/case-insensitive/fuzzy ranking, safe quoted filenames,
+  directory-only cd, variables, command positions, simple aliases and local Git refs.
+- Add a compact candidate menu with repeated Tab/Shift-Tab cycling and completion regression tests.
+
 - Audit supported commands against Bash and add a dedicated reliability suite.
 - Fix whole-token aliases, assignment previews, substitution statuses, recursive defaults and IFS splitting.
 - Share bounded delimiter scanners; preserve significant escaped whitespace and substitution comments.

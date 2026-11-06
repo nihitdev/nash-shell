@@ -57,7 +57,7 @@ config set prompt.theme catppuccin
 ```
 
 Installed themes: minimal, classic, modern, catppuccin, rose-pine, tokyo-night, gruvbox,
-nord, dracula and monochrome, plus inherited default/rice/power/mono templates. Themes need
+nord, dracula, monochrome and nebula, plus inherited default/rice/power/mono templates. Themes need
 the installed data files; when running only from a checkout, pass an explicit path such as
 `config set prompt.theme ./themes/catppuccin.conf` from the repository root.
 
@@ -70,6 +70,10 @@ config set prompt.left '{cyan}nash{reset} {cwd}
 {fail}{arrow} '
 config set prompt.right '{dim}{time}{reset}'
 ```
+
+Nebula is a two-line blue/lavender native theme with directory, Git branch, failure status and
+an optional right-side clock. Enable it with `config set prompt.theme nebula`. Theme files use
+`\n` for a line break and `\\` for a literal backslash. Reloading a theme replaces its templates.
 
 Set the theme first, then custom left/right templates; later commands override earlier ones.
 Right prompts display only when they fit on one input row. `NO_COLOR` or `TERM=dumb` disables

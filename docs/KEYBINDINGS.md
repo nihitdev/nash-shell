@@ -2,7 +2,8 @@
 
 | Key | Action |
 |---|---|
-| Tab | complete a command/path; extend the shared prefix when ambiguous |
+| Tab | complete or extend a shared prefix; repeat to cycle through candidates |
+| Shift-Tab | cycle backward through completion candidates |
 | Up / Down | navigate session and loaded history |
 | Right at end / Ctrl-F | accept the current history suggestion |
 | Left / Right | move by UTF-8 codepoint |
@@ -22,9 +23,27 @@ History suggestions appear after a matching prefix. Colors distinguish valid com
 missing commands, quoted strings, operators and variables. A red command can still be a
 runtime-expanded command; validation is a simple PATH/builtin/alias check.
 
-Completion handles executable names and file/directory paths. It is not yet fuzzy or Git-aware.
-Quoted/complex expansion prefixes have limited completion. Filenames containing terminal
-control characters are excluded from suggestions. Cursor movement is by codepoint rather than
+Completion recognizes commands after pipes/conditionals, assignment prefixes, aliases,
+executable names, file paths and `cd` directories. Exact prefixes rank first; when none match,
+case-insensitive prefixes and then fuzzy subsequence matches are tried. Type `cat fzt` to match
+`fuzzy-target`, for example. Hidden files require a leading dot. Paths with spaces, quotes and
+shell metacharacters are escaped before insertion; open literal quotes are handled safely.
+`~/` paths and `$NAME` / `${NAME}` variable-name completion are supported.
+
+Tab inserts a unique candidate or extends a shared prefix, and shows a compact candidate row
+when ambiguous. Repeated Tab cycles forward; Shift-Tab cycles backward. Editing or moving the
+cursor dismisses the menu. Candidates are capped at 256, and directory enumeration at 20000
+entries per request. Continued cycling reuses the candidate list.
+
+For `git`, Tab suggests common subcommands; `switch`, `checkout`, `merge`, `rebase`, and `show`
+can complete local/remote branches and tags (`switch` offers local branches). Simple aliases such as `g=git` and `gsw='git switch'`
+share this context. Local ref lookup uses direct argv with a 200 ms deadline; it does not fetch
+or run shell source. Git options, complex alias bodies, arbitrary tool-specific completions,
+command-substitution completion and full variable expansion within paths remain unsupported.
+After Git's `--`, completion uses files. Completion never executes substitutions to discover
+matches. Filenames containing terminal control characters are excluded.
+
+Cursor movement is by codepoint rather than
 full grapheme cluster, so some combined emoji/characters need more than one cursor step.
 
 Customize settings in `config.nash`:

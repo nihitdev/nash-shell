@@ -100,6 +100,29 @@ class TerminalTests(unittest.TestCase):
     def test_completion(self):
         f=self.root/'unique-completion';f.write_text('completed\n')
         self.command(('cat '+str(self.root)+'/unique-comp').encode()+b'\t',b'completed')
+    def test_completion_quotes_fuzzy_and_menu(self):
+        (self.root/'two words').write_text('quoted-file\n')
+        (self.root/'fuzzy-target').write_text('fuzzy-file\n')
+        (self.root/'cycle-alpha').write_text('alpha-choice\n')
+        (self.root/'cycle-beta').write_text('beta-choice\n')
+        (self.root/'unique-middle').write_text('middle\n')
+        base=str(self.root).encode()+b'/'
+        self.command(b'cat "'+base+b'two w\t', b'quoted-file')
+        self.command(b'cat '+base+b'fzt\t', b'fuzzy-file')
+        self.command(b'cat '+base+b'cycle-\t\t', b'alpha-choice')
+        self.command(b'cat '+base+b'cycle-\t\x1b[Z', b'beta-choice')
+        self.command(b'echo '+base+b'unique-miZZ tail'+b'\x1b[D'*7+b'\t', base+b'unique-middle tail')
+    def test_completion_git_branch(self):
+        import shutil, subprocess
+        if not shutil.which('git'): self.skipTest('git unavailable')
+        repo=self.root/'repository';repo.mkdir()
+        subprocess.run(['git','init','-q',str(repo)],check=True)
+        subprocess.run(['git','-C',str(repo),'symbolic-ref','HEAD','refs/heads/main'],check=True)
+        subprocess.run(['git','-C',str(repo),'-c','user.name=Test','-c','user.email=test@example.com','-c','commit.gpgsign=false','commit','--allow-empty','-qm','fixture'],check=True)
+        subprocess.run(['git','-C',str(repo),'branch','nebula-feature'],check=True)
+        self.send(b'cd '+str(repo).encode()+b'\r');self.until_prompt()
+        self.send(b'git switch nebula-f\t\r');self.until_prompt()
+        self.command(b'git branch --show-current',b'nebula-feature')
     def test_prompt_config_and_hooks(self):
         self.command(b'config_loaded',b'config-script-loaded')
         self.command(b'echo $NASH_CONFIG_TEST',b'loaded')

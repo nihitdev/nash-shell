@@ -12,7 +12,9 @@ Nash retains ang.sh's small-module layout while moving runtime coordination out 
 - `integrations`: direct argv capture with output cap and deadline; Starship protocol; lifecycle hooks.
 - `config`: command-based config.nash startup, validated config builtin, legacy TOML fallback and history loading.
 - `editor` / `highlight`: termios RAII, Unicode movement, display-cell positions, raw-input coloring,
-  completion, history suggestions and search.
+  candidate-menu rendering, history suggestions and search.
+- `completion`: literal-word context, safely escaped replacements, ranked prefix/fuzzy candidates,
+  directory/executable filtering, variables, simple alias context and bounded local Git ref lookup.
 - `prompt`: inherited template renderer, themes, ANSI-aware widths and native fallback.
 
 No command is delegated to `/bin/sh` by Nash. External executables may of course invoke their

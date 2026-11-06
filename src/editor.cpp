@@ -1,4 +1,5 @@
 #include "editor.h"
+#include "completion.h"
 #include "env.h"
 #include "highlight.h"
 #include "integrations.h"
@@ -135,63 +136,17 @@ void save_history(ShellState &st) {
         st.history_saved -= remove;
     }
 }
-static std::vector<std::string> complete(const std::string &prefix, bool first,
-                                         const ShellState &st) {
-    std::set<std::string> matches;
-    auto scan = [&](const std::filesystem::path &dir, const std::string &base, bool commands) {
-        std::error_code ec;
-        for (const auto &entry : std::filesystem::directory_iterator(dir, ec)) {
-            auto name = entry.path().filename().string();
-            if (std::any_of(name.begin(), name.end(),
-                            [](unsigned char c) { return c < 32 || c == 127; }))
-                continue;
-            if (!name.starts_with(base) || (base.empty() && name.starts_with('.')))
-                continue;
-            bool directory = entry.is_directory(ec);
-            if (commands && (directory || access(entry.path().c_str(), X_OK) != 0))
-                continue;
-            auto candidate = commands ? name
-                                      : (prefix.substr(0, prefix.size() - base.size()) + name +
-                                         (directory ? "/" : ""));
-            matches.insert(candidate);
-        }
-    };
-    auto slash = prefix.rfind('/');
-    auto base = slash == std::string::npos ? prefix : prefix.substr(slash + 1);
-    auto directory = slash == std::string::npos ? std::string(".") : prefix.substr(0, slash + 1);
-    if (directory.starts_with("~/"))
-        directory = st.get("HOME") + directory.substr(1);
-    scan(directory, base, false);
-    if (first && slash == std::string::npos) {
-        for (const auto &name :
-             {"cd", "pwd", "echo", "export", "unset", "alias", "unalias", "source", "exit", "jobs",
-              "fg", "bg", "wait", "history", "help", "config", "has"})
-            if (std::string(name).starts_with(prefix))
-                matches.insert(name);
-        for (const auto &[name, _] : st.aliases)
-            if (name.starts_with(prefix))
-                matches.insert(name);
-        for (const auto &[name, _] : st.abbrs)
-            if (name.starts_with(prefix))
-                matches.insert(name);
-        std::string path = st.get("PATH");
-        size_t p = 0;
-        do {
-            auto end = path.find(':', p);
-            scan(path.substr(p, end - p).empty() ? "." : path.substr(p, end - p), prefix, true);
-            if (end == std::string::npos)
-                break;
-            p = end + 1;
-        } while (true);
-    }
-    return {matches.begin(), matches.end()};
-}
 static std::optional<std::string> edit_line(ShellState &st, const std::string &left,
                                             const std::string &right) {
     RawTerminal raw;
     std::string buffer, draft, suggestion;
     size_t cursor = 0, history_index = st.history.size();
     int cursor_row = 0;
+    Completion completion;
+    std::string completion_buffer;
+    size_t completion_cursor = 0, completion_index = 0;
+    bool cycling = false;
+    std::vector<std::string> menu;
     auto newline = left.rfind('\n');
     auto tail = newline == std::string::npos ? left : left.substr(newline + 1);
     if (newline != std::string::npos)
@@ -202,7 +157,7 @@ static std::optional<std::string> edit_line(ShellState &st, const std::string &l
         ioctl(0, TIOCGWINSZ, &ws);
         int columns = ws.ws_col ? ws.ws_col : 80;
         suggestion.clear();
-        if (st.suggestions_enabled && !buffer.empty() && cursor == buffer.size())
+        if (menu.empty() && st.suggestions_enabled && !buffer.empty() && cursor == buffer.size())
             for (auto i = st.history.rbegin(); i != st.history.rend(); ++i)
                 if (i->starts_with(buffer) && i->size() > buffer.size()) {
                     suggestion = i->substr(buffer.size());
@@ -224,6 +179,22 @@ static std::optional<std::string> edit_line(ShellState &st, const std::string &l
         // Explicitly resolve terminal autowrap at the last column.
         if (end.second == 0 && (!buffer.empty() || !suggestion.empty()))
             output += " \b";
+        if (!menu.empty()) {
+            std::string row = "  ";
+            size_t shown = 0;
+            for (size_t i = 0; i < menu.size(); ++i) {
+                auto label = safe(menu[i]);
+                if (width(row) + width(label) + 8 >= columns)
+                    break;
+                row += label + "  ";
+                ++shown;
+            }
+            if (shown < menu.size())
+                row += "…";
+            output +=
+                std::string("\r\n") + (color ? "\033[36m" : "") + row + (color ? "\033[0m" : "");
+            ++end.first;
+        }
         if (end.first > target.first)
             output += "\033[" + std::to_string(end.first - target.first) + "A";
         output += "\r";
@@ -292,6 +263,12 @@ static std::optional<std::string> edit_line(ShellState &st, const std::string &l
         }
         if (!key.empty() && key.size() == 1)
             c = key[0];
+        const bool tab = key == "\t" || key == "\033[Z";
+        if (!tab) {
+            menu.clear();
+            completion_buffer.clear();
+            cycling = false;
+        }
         if ((c == '\r' || c == '\n') && !paste && key.size() == 1) {
             cursor = buffer.size();
             suggestion.clear();
@@ -373,29 +350,59 @@ static std::optional<std::string> edit_line(ShellState &st, const std::string &l
                     cursor = buffer.size();
                     break;
                 }
-        } else if (c == '\t' && st.completion_enabled && !paste) {
-            auto start = cursor ? buffer.find_last_of(" \t;|&", cursor - 1) : std::string::npos;
-            start = start == std::string::npos ? 0 : start + 1;
-            auto prefix = buffer.substr(start, cursor - start);
-            if (prefix.find_first_of("'\"\\$") == std::string::npos) {
-                auto matches = complete(prefix, start == 0, st);
-                if (!matches.empty()) {
-                    auto common = matches[0];
-                    for (auto &m : matches)
-                        while (!m.starts_with(common))
+        } else if (tab && st.completion_enabled && !paste) {
+            if (!completion_buffer.empty() && buffer == completion_buffer &&
+                cursor == completion_cursor && completion.candidates.size() > 1) {
+                if (!cycling)
+                    completion_index = key == "\033[Z" ? completion.candidates.size() - 1 : 0;
+                else if (key == "\033[Z")
+                    completion_index = (completion_index + completion.candidates.size() - 1) %
+                                       completion.candidates.size();
+                else
+                    completion_index = (completion_index + 1) % completion.candidates.size();
+                cycling = true;
+                auto replacement = completion.candidates[completion_index];
+                buffer.replace(completion.begin, completion.end - completion.begin, replacement);
+                cursor = completion.begin + replacement.size();
+                completion.end = cursor;
+            } else {
+                completion = complete_line(buffer, cursor, st);
+                cycling = false;
+                if (!completion.candidates.empty()) {
+                    auto common = completion.candidates.front();
+                    for (auto &match : completion.candidates)
+                        while (!match.starts_with(common))
                             common.pop_back();
-                    std::string escaped;
-                    for (char x : common) {
-                        if (std::string(" \t'\"\\$;&|(){}<>*?[]#").find(x) != std::string::npos)
-                            escaped += '\\';
-                        escaped += x;
+                    // A shared byte prefix must end at a UTF-8 and shell-escape boundary.
+                    if (common.size() < completion.candidates.front().size())
+                        while (!common.empty() &&
+                               (static_cast<unsigned char>(
+                                    completion.candidates.front()[common.size()]) &
+                                0xc0) == 0x80)
+                            common.pop_back();
+                    size_t slashes = 0;
+                    for (size_t i = common.size(); i && common[i - 1] == '\\'; --i)
+                        ++slashes;
+                    if (slashes % 2)
+                        common.pop_back();
+                    auto typed = buffer.substr(completion.begin, cursor - completion.begin);
+                    if (completion.candidates.size() == 1 ||
+                        (common.starts_with(typed) && common.size() > typed.size())) {
+                        if (completion.candidates.size() == 1 && !common.ends_with('/')) {
+                            if (completion.end < buffer.size() && buffer[completion.end] == ' ')
+                                ++completion.end;
+                            common += ' ';
+                        }
+                        buffer.replace(completion.begin, completion.end - completion.begin, common);
+                        cursor = completion.begin + common.size();
+                        completion.end = cursor;
                     }
-                    if (matches.size() == 1 && !common.ends_with('/'))
-                        escaped += ' ';
-                    buffer.replace(start, cursor - start, escaped);
-                    cursor = start + escaped.size();
                 }
             }
+            menu = completion.candidates.size() > 1 ? completion.candidates
+                                                    : std::vector<std::string>{};
+            completion_buffer = buffer;
+            completion_cursor = cursor;
         } else if (key == "\033\r" || key == "\033\n") {
             buffer.insert(cursor++, 1, '\n');
         } else if (key.size() == 1 &&

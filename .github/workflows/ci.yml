@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y clang-format-18
-      - run: clang-format-18 --dry-run --Werror src/*.cpp src/*.h tests/unit.cpp
+      - run: clang-format-18 --dry-run --Werror src/*.cpp src/*.h tests/*.cpp
 
   documentation-site:
     runs-on: ubuntu-24.04

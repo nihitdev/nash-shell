@@ -47,11 +47,11 @@ to your existing Starship prompt when you want to.
 | | Available today |
 |---|---|
 | **A working shell** | External commands, pipelines, redirections, variables, quoting, globbing, and command substitution. |
-| **Comfortable editing** | History suggestions, syntax and command highlighting, Tab completion, reverse history search, and UTF-8 cursor movement. |
+| **Comfortable editing** | History suggestions, syntax and command highlighting, ranked fuzzy/path/Git Tab completion with candidate cycling, reverse history search, and UTF-8 cursor movement. |
 | **Your own configuration** | Nash commands for settings, aliases, environment variables, startup tools, hooks, and keybindings. |
 | **Two prompt engines** | A native prompt by default; optional Starship with your existing configuration, status, duration, directory, and job context. |
 | **Job control** | Background pipelines, foreground terminal handoff, Ctrl-C, Ctrl-Z, `jobs`, `fg`, `bg`, and `wait`. |
-| **Native themes** | Minimal, Classic, Modern, Catppuccin, Rosé Pine, Tokyo Night, Gruvbox, Nord, Dracula, and Monochrome. |
+| **Native themes** | Minimal, Classic, Modern, Catppuccin, Rosé Pine, Tokyo Night, Gruvbox, Nord, Dracula, Monochrome, and the custom Nebula theme. |
 
 ## Quick start
 
@@ -276,7 +276,7 @@ operators, positional script arguments, asynchronous whole `&&`/`||` lists, and
 `set -e` / pipefail are not implemented. Do not use it to run arbitrary Bash or POSIX scripts.
 
 Editing moves by UTF-8 codepoint rather than grapheme cluster, and unusual emoji widths can
-vary by terminal. Multiline history is session-only. Fuzzy/Git-aware completion, native Atuin
+vary by terminal. Multiline history is session-only. Full tool-specific completion scripts, native Atuin
 history, Direnv environment import, and a plugin ABI remain future work. Right prompts are
 single-line. Job control needs broader stress testing before use as a login shell.
 

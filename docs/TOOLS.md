@@ -196,7 +196,7 @@ alias gl='git log --oneline -10'
 ```
 
 The native prompt shows a branch when its simple `.git/HEAD` lookup finds one; Starship's Git
-modules handle richer prompt information. Git-aware Tab completion is not implemented yet.
+modules handle richer prompt information. Tab completes common Git subcommands and local/remote refs for switch, checkout, merge, rebase and show; it does not fetch or complete every Git option.
 These aliases do not create commits, push, or stage anything automatically.
 
 Source: [Git reference](https://git-scm.com/docs).
