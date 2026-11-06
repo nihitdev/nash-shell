@@ -50,6 +50,24 @@ class ShellTests(unittest.TestCase):
     def test_background(self):
         self.check('sleep 0.02 & wait; echo $?','0\n')
         self.check('false & wait; echo $?','1\n')
+    def test_take_creates_and_enters_directory(self):
+        with tempfile.TemporaryDirectory() as d:
+            target=pathlib.Path(d, 'new folder', 'nested')
+            result=self.run_shell(f'take "{target}"; pwd; echo "$PWD"; echo "$OLDPWD"')
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertEqual(result.stdout,str(target)+'\n'+str(target)+'\n'+os.getcwd()+'\n')
+            self.assertTrue(target.is_dir())
+            self.check(f'take "{target}"; pwd',str(target)+'\n')
+    def test_take_errors_do_not_change_directory(self):
+        with tempfile.TemporaryDirectory() as d:
+            occupied=pathlib.Path(d,'occupied')
+            occupied.write_text('not a directory')
+            result=self.run_shell(f'take "{occupied}/child"; echo $?; pwd')
+            self.assertEqual(result.returncode,0)
+            self.assertEqual(result.stdout,'1\n'+os.getcwd()+'\n')
+            self.assertIn('take:',result.stderr)
+            self.check('take; echo $?', '2\n')
+            self.check('take one two; echo $?', '2\n')
     def test_aliases(self):
         self.check("alias hi='echo hello'\nhi world",'hello world\n')
     def test_parse_errors(self):
