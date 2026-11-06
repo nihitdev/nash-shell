@@ -43,6 +43,9 @@ ranges and unsupported actions report an error and leave the previous setting in
 | `history.enabled` | boolean | true |
 | `history.path` | quoted path; `~` supported | `$XDG_DATA_HOME/nash/history` or `~/.local/share/nash/history` |
 | `history.limit` | integer 1–1000000 | 5000; in-memory limit, not disk rotation |
+| `integrations.fastfetch.enabled` | boolean | false; run Fastfetch once on interactive startup if installed |
+| `integrations.eza.enabled` | boolean | false; manage `ll`, `la`, `lt` shortcuts if Eza exists |
+| `integrations.bat.enabled` | boolean | false; manage `view` using Bat or batcat if found |
 | `editor.autocd` | boolean | false; enter a directory by typing its name |
 | `startup.file` | quoted path | empty; optional additional Nash script |
 
@@ -90,6 +93,25 @@ You do not need to run `starship init bash` or source Fish initialization code. 
 status, directory, duration, width, pipeline statuses and jobs directly. To switch back,
 set `prompt.engine native`. Use `nash-prompt --engine native` or `--engine starship` to preview
 without changing the active engine. The preview builtin prints rendered prompt text.
+
+## Native tool settings
+
+```sh
+config set integrations.fastfetch.enabled true
+config set integrations.eza.enabled true
+config set integrations.bat.enabled true
+```
+
+Every setting is opt-in. Missing programs are skipped. Eza adds `ll`, `la`, and `lt`; Bat
+adds `view` with paging disabled and checks `batcat` when `bat` is absent. Existing aliases
+are preserved. Define native settings before your own overriding aliases if desired.
+Disabling a tool removes only unchanged shortcuts managed by Nash, leaving custom aliases intact.
+`integrations` shows availability and whether each native adapter is enabled.
+
+Fastfetch runs once after interactive startup configuration. Changing the flag or sourcing a
+config does not immediately run the banner; restart Nash or run `fastfetch` manually. Do not
+also add a separate Fastfetch startup command unless you intend two banners. Prompt/command
+exit status is preserved across the native startup adapter. See [tool recipes](TOOLS.md).
 
 ## Hooks, keys and extra files
 

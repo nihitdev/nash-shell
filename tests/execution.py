@@ -145,6 +145,28 @@ class ShellTests(unittest.TestCase):
             config=pathlib.Path(d,'config.nash')
             config.write_text("config set prompt.engine native\nalias greet='echo hello'\nexport NASH_CONFIG_MARKER=ready\n")
             self.check(f'source {config}\ngreet\necho $NASH_CONFIG_MARKER','hello\nready\n')
+    def test_native_tool_shortcuts(self):
+        with tempfile.TemporaryDirectory() as d:
+            for name in ['eza','bat']:
+                tool=pathlib.Path(d,name)
+                tool.write_text('#!/bin/sh\nprintf "'+name+'-native\\n"\n')
+                tool.chmod(0o755)
+            env=dict(os.environ,PATH=d+':/usr/bin:/bin')
+            result=self.run_shell('config set integrations.eza.enabled true\nconfig set integrations.bat.enabled true\nll\nview file\nconfig get integrations.eza.enabled',env=env)
+            self.assertEqual((result.returncode,result.stdout),(0,'eza-native\nbat-native\ntrue\n'),result.stderr)
+            result=self.run_shell("alias ll='echo custom'\nconfig set integrations.eza.enabled true\nll\nconfig set integrations.eza.enabled false\nll",env=env)
+            self.assertEqual(result.stdout,'custom\ncustom\n')
+            result=self.run_shell('config set integrations.eza.enabled true\nconfig set integrations.eza.enabled false\nalias ll',env=env)
+            self.assertEqual(result.returncode,1)
+    def test_native_batcat_fallback(self):
+        with tempfile.TemporaryDirectory() as d:
+            tool=pathlib.Path(d,'batcat');tool.write_text('#!/bin/sh\nprintf "batcat-native\\n"\n');tool.chmod(0o755)
+            result=self.run_shell('config set integrations.bat.enabled true\nview example',env=dict(os.environ,PATH=d))
+            self.assertEqual((result.returncode,result.stdout),(0,'batcat-native\n'),result.stderr)
+    def test_native_tool_missing_is_optional(self):
+        env=dict(os.environ,PATH='/nonexistent')
+        result=self.run_shell('config set integrations.fastfetch.enabled true; config set integrations.eza.enabled true; config set integrations.bat.enabled true; config get integrations.bat.enabled',env=env)
+        self.assertEqual((result.returncode,result.stdout),(0,'true\n'),result.stderr)
     def test_empty_command(self):
         self.check('')
 if __name__=='__main__': unittest.main()

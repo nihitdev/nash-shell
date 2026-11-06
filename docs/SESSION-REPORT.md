@@ -134,3 +134,36 @@ config.nash and verify precedence, aliases, exports and hooks. Documentation tes
 shipped config and Fastfetch recipes with fixtures, and validate local Markdown links.
 Release rebuilt successfully. Global reinstallation still requires the user's sudo password;
 the new executable is directly runnable at `build-release/nash` until then.
+
+## Arch-inspired website and native tool support — 2026-11-06
+
+Added opt-in native Fastfetch startup and managed Eza/Bat shortcuts via
+`integrations.fastfetch.enabled`, `integrations.eza.enabled`, and `integrations.bat.enabled`.
+Fastfetch runs once per interactive startup and preserves status. Eza supplies ll/la/lt;
+Bat supplies view, with batcat fallback. Missing tools are skipped. Custom aliases are preserved,
+and disabling an adapter removes only unchanged aliases owned by Nash.
+
+Added the source for a 31-page static documentation website in `website/`: an original
+Arch-inspired layout, generated handbook with full-text search and outlines, tool directory
+and support filters, native config builder, copy/download controls, mobile navigation,
+light/dark themes and an original SVG mark. Existing Markdown remains the maintained handbook;
+the website builder retains a self-contained content snapshot for isolated builds.
+
+The user requested manual Vercel deployment. No website deployment was made. ChatGPT hosting
+metadata was removed from source; website/vercel.json and website/README.md contain the manual
+Vercel root, install/build and output settings. No Vercel project was linked or deployed.
+
+Verification: Debug CTest passed all four suites in 10.07 s; ASan/UBSan CTest passed all four in
+13.96 s. Release rebuilt; all 32 execution tests and 3 documentation tests passed. New tests
+cover native shortcut setup, custom-alias preservation, disabling shortcuts, batcat fallback,
+missing tools and Fastfetch's once-per-startup behavior in native and Starship PTY sessions.
+The PTY suite now contains 23 cases. Formatting and diff checks passed.
+
+Website verification: generated and checked 31 HTML pages and 13 search-index targets;
+all internal links, anchors and referenced assets passed validation. Headless Chrome checks
+passed for desktop/mobile layout, search, tool filters, config generation/download, theme
+persistence, navigation, lack of horizontal overflow, and absence of JavaScript page errors.
+Desktop/mobile screenshots were visually inspected. The exact manual Vercel build commands
+also succeeded in a clean standalone folder using only the retained content snapshot.
+GitHub CI now builds and validates the website as well as the shell. Hosting itself remains
+for the user to perform; no production-host verification is claimed.

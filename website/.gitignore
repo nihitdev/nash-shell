@@ -1,0 +1,7 @@
+dist/
+node_modules/
+.sites-runtime/
+__pycache__/
+.venv/
+.python-deps/
+.vercel/

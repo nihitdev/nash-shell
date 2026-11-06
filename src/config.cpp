@@ -1,4 +1,5 @@
 #include "config.h"
+#include "integrations.h"
 #include "prompt.h"
 #include "shell.h"
 #include "util.h"
@@ -109,12 +110,16 @@ int bi_config(const std::vector<std::string> &a, ShellState &st) {
                   << config_dir() << "/config.nash\n";
         return 0;
     }
-    std::map<std::string, bool *> flags = {{"autosuggestions.enabled", &st.suggestions_enabled},
-                                           {"highlighting.enabled", &st.highlighting_enabled},
-                                           {"completion.enabled", &st.completion_enabled},
-                                           {"history.enabled", &st.history_enabled},
-                                           {"colors.enabled", &st.colors_enabled},
-                                           {"editor.autocd", &st.autocd}};
+    std::map<std::string, bool *> flags = {
+        {"autosuggestions.enabled", &st.suggestions_enabled},
+        {"highlighting.enabled", &st.highlighting_enabled},
+        {"completion.enabled", &st.completion_enabled},
+        {"history.enabled", &st.history_enabled},
+        {"colors.enabled", &st.colors_enabled},
+        {"integrations.fastfetch.enabled", &st.fastfetch_enabled},
+        {"integrations.eza.enabled", &st.eza_enabled},
+        {"integrations.bat.enabled", &st.bat_enabled},
+        {"editor.autocd", &st.autocd}};
     std::map<std::string, std::string *> strings = {
         {"prompt.engine", &st.prompt_engine}, {"prompt.theme", &st.theme_name},
         {"prompt.left", &st.prompt_left},     {"prompt.right", &st.prompt_right},
@@ -144,6 +149,8 @@ int bi_config(const std::vector<std::string> &a, ShellState &st) {
             if (value != "true" && value != "false" && value != "on" && value != "off")
                 return error(key + " expects true or false");
             *flags[key] = value == "true" || value == "on";
+            if (key.starts_with("integrations."))
+                configure_tool_shortcuts(st);
         } else if (key == "prompt.theme") {
             std::string detail;
             if (!load_theme(value, st, &detail))

@@ -174,14 +174,62 @@ void run_hook(const std::string &point, ShellState &st) {
     st.last_status = status;
     st.pipeline_status = pipeline;
 }
-int bi_integrations(const std::vector<std::string> &, ShellState &) {
+void configure_tool_shortcuts(ShellState &st) {
+    std::map<std::string, std::string> desired;
+    if (st.eza_enabled && find_executable("eza")) {
+        desired["ll"] = "eza -lah --icons=auto";
+        desired["la"] = "eza -a --icons=auto";
+        desired["lt"] = "eza --tree --level=2 --icons=auto";
+    }
+    if (st.bat_enabled) {
+        if (find_executable("bat"))
+            desired["view"] = "bat --paging=never";
+        else if (find_executable("batcat"))
+            desired["view"] = "batcat --paging=never";
+    }
+    for (const auto &[name, body] : st.managed_tool_aliases)
+        if (!desired.contains(name) && st.aliases.contains(name) && st.aliases[name] == body)
+            st.aliases.erase(name);
+    std::map<std::string, std::string> owned;
+    for (const auto &[name, body] : desired) {
+        auto previous = st.managed_tool_aliases.find(name);
+        if (!st.aliases.contains(name) ||
+            (previous != st.managed_tool_aliases.end() && st.aliases[name] == previous->second)) {
+            st.aliases[name] = body;
+            owned[name] = body;
+        }
+    }
+    st.managed_tool_aliases = std::move(owned);
+}
+void run_startup_tools(ShellState &st) {
+    configure_tool_shortcuts(st);
+    if (!st.interactive || !st.fastfetch_enabled || !find_executable("fastfetch"))
+        return;
+    const int status = st.last_status;
+    const auto pipeline = st.pipeline_status;
+    run_source("fastfetch", st);
+    st.last_status = status;
+    st.pipeline_status = pipeline;
+}
+int bi_integrations(const std::vector<std::string> &, ShellState &st) {
     for (const auto *tool : {"starship", "zoxide", "fzf", "atuin", "direnv", "git", "fastfetch",
                              "eza", "bat", "yazi", "prism", "yoo"}) {
-        auto path = find_executable(tool);
-        std::cout << tool << ": " << (path ? *path : "not installed")
-                  << (std::string(tool) == "starship" ? " (native prompt integration)"
-                                                      : " (external command; no native adapter)")
-                  << '\n';
+        const std::string name = tool;
+        auto path = find_executable(name);
+        if (name == "bat" && !path)
+            path = find_executable("batcat");
+        std::cout << name << ": " << (path ? *path : "not installed");
+        if (name == "starship")
+            std::cout << " (native prompt integration)";
+        else if (name == "fastfetch" || name == "eza" || name == "bat") {
+            const bool enabled = name == "fastfetch" ? st.fastfetch_enabled
+                                 : name == "eza"     ? st.eza_enabled
+                                                     : st.bat_enabled;
+            std::cout << " (native " << (name == "fastfetch" ? "startup" : "shortcuts") << "; "
+                      << (enabled ? "enabled" : "disabled") << ")";
+        } else
+            std::cout << " (external command; no native adapter)";
+        std::cout << '\n';
     }
     return 0;
 }

@@ -22,3 +22,18 @@ jobs:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y clang-format-18
       - run: clang-format-18 --dry-run --Werror src/*.cpp src/*.h tests/unit.cpp
+
+  documentation-site:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r website/requirements.txt
+      - run: python website/tools/build.py
+      - run: python website/tools/check.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check website/assets/app.js

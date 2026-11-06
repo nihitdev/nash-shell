@@ -10,15 +10,15 @@ config set history.limit 5000
 config set editor.autocd false
 
 # Aliases and environment variables.
-alias ll='ls -lah'
 alias gs='git status --short'
 # export EDITOR=nvim
 
 # Optional tools: only activate commands that exist on PATH.
-has eza && alias ll='eza -lah --icons=auto'
-has bat && alias view='bat --paging=never'
+config set integrations.eza.enabled true
+config set integrations.bat.enabled true
+config set integrations.fastfetch.enabled false
 # Uncomment to display system information when opening Nash:
-# has fastfetch && fastfetch
+# config set integrations.fastfetch.enabled true
 
 # Opt into Starship later (it keeps its own starship.toml):
 # config set prompt.engine starship

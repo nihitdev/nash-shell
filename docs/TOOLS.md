@@ -4,7 +4,7 @@ This guide shows everyday commands and optional startup setup. Tools remain sepa
 install the ones you want through their official instructions or your package manager. Nash
 works without them. Run `integrations` to report availability, or `has TOOL` to test one silently.
 
-Only Starship has a native adapter. Aliases and lifecycle recipes below are explicit user
+Starship, Fastfetch, Eza and Bat have native support. Other tools use direct CLI commands or documented recipes. Aliases and lifecycle recipes below are explicit user
 configuration, not a claim of complete Fish/Zsh-compatible integrations. Commands were checked
 against installed CLI help and the linked upstream documentation; interactive workflows are
 not all end-to-end tested. Tool versions can differ, so check `TOOL --help` when a flag changes.
@@ -20,8 +20,12 @@ fastfetch
 Add this to `~/.config/nash/config.nash` to display it once when starting each interactive Nash:
 
 ```sh
-has fastfetch && fastfetch
+config set integrations.fastfetch.enabled true
 ```
+
+The native startup adapter skips a missing executable and preserves command status. It runs
+once during startup, not on every prompt or config reload. Use either this setting or the older
+`has fastfetch && fastfetch` command recipe, not both.
 
 For a manual shortcut instead:
 
@@ -30,7 +34,9 @@ has fastfetch && alias ff='fastfetch'
 ```
 
 Use one startup invocation, not a `precmd` hook: precmd would run it before every prompt.
-Reloading your config also reruns its commands. To stop the banner, comment out the startup line.
+The native setting applies to the next interactive startup; manually invoking or sourcing a
+Fastfetch command runs it immediately. To stop the banner, set `integrations.fastfetch.enabled false` and restart, or remove the
+manual startup command if you used that recipe.
 
 Fastfetch keeps its own JSONC file, normally `~/.config/fastfetch/config.jsonc`. Generate a config
 with `fastfetch --gen-config` when needed; inspect any existing file first and follow the
@@ -72,7 +78,15 @@ eza --tree --level=2
 eza -l --git
 ```
 
-An optional alias preserves a working fallback when Eza is absent:
+Enable managed shortcuts in `config.nash`:
+
+```sh
+config set integrations.eza.enabled true
+```
+
+Nash creates `ll`, `la`, and `lt` only when Eza is installed, preserves existing aliases, and
+removes unchanged generated shortcuts when disabled. If you already define `ll`, remove or
+rename that alias to let Nash manage it. Alternatively, use explicit aliases with a fallback:
 
 ```sh
 alias ll='ls -lah'
@@ -91,7 +105,14 @@ bat --paging=never README.md
 bat --list-themes
 ```
 
-Use a dedicated viewer alias:
+Enable the managed viewer:
+
+```sh
+config set integrations.bat.enabled true
+```
+
+Nash sets `view` to Bat with paging disabled, falling back to the `batcat` executable. An existing
+`view` alias is preserved. Missing Bat is skipped. Alternatively, define a dedicated viewer alias:
 
 ```sh
 has bat && alias view='bat --paging=never'

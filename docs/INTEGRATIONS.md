@@ -1,11 +1,14 @@
 # Optional integrations
 
 Starship is implemented using its direct CLI; see README. Its config is never rewritten.
+Fastfetch has an opt-in once-per-startup adapter; Eza and Bat provide opt-in managed shortcuts.
+Settings live under `integrations.TOOL.enabled` in config.nash. Existing aliases are preserved.
+
 The direct-capture helper limits output to 1 MiB and kills the helper process group after the
 configured timeout. It uses `/dev/null` for stdin/stderr so prompt helpers do not steal input.
 
 `integrations` reports executable discovery; presence is not a claim of a working adapter.
-Zoxide, FZF, Atuin, Direnv, Git, Fastfetch, Eza, Bat, Yazi, Prism and yoo run as external commands today.
+Zoxide, FZF, Atuin, Direnv, Git, Yazi, Prism and yoo run as external commands today.
 Git prompt modules are implemented by Starship. Native branch/path Git completion is planned.
 
 Lifecycle hooks use Nash command strings in `config.nash`:

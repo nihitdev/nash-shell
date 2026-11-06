@@ -198,15 +198,15 @@ Use the tools you already know, with explicit setup where needed:
 
 | Tool | How it works in Nash |
 |---|---|
-| **Fastfetch** | Run manually or add `has fastfetch && fastfetch` to your startup file. |
-| **Eza / Bat** | Optional aliases for directory listings and highlighted file viewing. |
+| **Fastfetch** | Opt in with `config set integrations.fastfetch.enabled true`. |
+| **Eza / Bat** | Opt-in managed shortcuts; existing aliases are preserved. |
 | **Git** | Ordinary Git commands, convenient aliases, and prompt information. |
 | **Zoxide** | Explicit directory-change hook and direct CLI queries. |
 | **FZF / Yazi** | Run as foreground terminal programs. |
 | **Atuin / Direnv** | External CLI commands; native history/environment adapters are pending. |
 | **Prism / yoo** | Run your installed developer tools; native adapters are pending. |
 
-**Only Starship currently has a native adapter.** Running a tool or defining an alias does
+**Starship, Fastfetch, Eza, and Bat have native support.** Running a tool or defining an alias does
 not imply complete shell integration. `integrations` reports availability; `has TOOL` checks
 for an external executable silently.
 
@@ -245,6 +245,11 @@ is substring-based; the history limit bounds memory rather than disk growth.
 
 See the [full key reference](docs/KEYBINDINGS.md) for editing, multiline input, paste handling,
 and custom bindings.
+
+## Website
+
+The [documentation website source](website/README.md) lives in `website/`. It includes a
+searchable handbook, tool support directory, and local config builder.
 
 ## Documentation
 

@@ -8,6 +8,11 @@ class TerminalTests(unittest.TestCase):
         (self.root/'nash').mkdir()
         config='config set prompt.engine '+getattr(self,'engine','native')+"\nconfig set prompt.left 'N> '\nconfig set colors.enabled false\nalias config_loaded='echo config-script-loaded'\nexport NASH_CONFIG_TEST=loaded\n"
         config+=getattr(self,'extra_config','')
+        if self._testMethodName=='test_fastfetch_startup_once':
+            config+='config set integrations.fastfetch.enabled true\n'
+            tool=self.root/'fastfetch'
+            tool.write_text('#!/bin/sh\nprintf "fastfetch-startup-fixture\\n"\n')
+            tool.chmod(0o755)
         (self.root/'nash/config.nash').write_text(config)
         # Native script wins over conflicting legacy TOML.
         (self.root/'nash/config.toml').write_text('[prompt]\nleft="WRONG> "\n')
@@ -20,7 +25,7 @@ class TerminalTests(unittest.TestCase):
             os.environ.update(PATH=str(self.root)+':'+os.environ['PATH'],NASH_PROMPT_LOG=str(self.root/'prompt-log'),XDG_CONFIG_HOME=str(self.root),XDG_DATA_HOME=str(self.root),TERM='xterm-256color')
             os.execv(NASH,[NASH])
         fcntl.ioctl(self.fd,termios.TIOCSWINSZ,struct.pack('HHHH',24,100,0,0))
-        self.pending=b'';self.until_prompt()
+        self.pending=b'';self.initial_output=self.until_prompt()
     def tearDown(self):
         try:os.kill(self.pid,signal.SIGKILL)
         except ProcessLookupError:pass
@@ -41,9 +46,14 @@ class TerminalTests(unittest.TestCase):
                 except OSError:break
         self.fail(f'missing {needle!r}: {self.pending!r}')
     def until_prompt(self, timeout=5):
-        self.until(b'\x00PROMPT\x00',timeout); self.until(b'N> ',timeout)
+        return self.until(b'\x00PROMPT\x00',timeout)+self.until(b'N> ',timeout)
     def command(self,source,output):
         self.send(source+b'\r');self.until(b'\r\n'+output+b'\r\n');self.until_prompt()
+    def test_fastfetch_startup_once(self):
+        self.assertEqual(self.initial_output.count(b'fastfetch-startup-fixture'),1)
+        self.send(b'echo after-banner\r')
+        output=self.until(b'\r\nafter-banner\r\n')+self.until_prompt()
+        self.assertNotIn(b'fastfetch-startup-fixture',output)
     def test_edit_and_unicode(self):
         self.command(b'echo abX\x1b[D\x7fc',b'acX')
         self.command('echo café\x7f'.encode(),b'caf')

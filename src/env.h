@@ -35,6 +35,10 @@ struct ShellState {
     int prompt_timeout_ms = 1500;
     long long command_duration_ms = 0;
     std::vector<int> pipeline_status;
+    bool fastfetch_enabled = false;
+    bool eza_enabled = false;
+    bool bat_enabled = false;
+    std::map<std::string, std::string> managed_tool_aliases;
     bool suggestions_enabled = true;
     bool highlighting_enabled = true;
     bool completion_enabled = true;

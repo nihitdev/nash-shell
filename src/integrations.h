@@ -26,6 +26,8 @@ struct ToolResult {
 // Direct argv execution: no sh -c, no evaluation of terminal output as shell code.
 ToolResult capture_tool(const std::vector<std::string> &args, int timeout_ms);
 std::optional<std::string> starship_prompt(const ShellState &st, bool right, int columns);
+void configure_tool_shortcuts(ShellState &st);
+void run_startup_tools(ShellState &st);
 void run_hook(const std::string &point, ShellState &st);
 int bi_integrations(const std::vector<std::string> &, ShellState &);
 } // namespace ang

@@ -52,8 +52,11 @@ int main(int argc, char **argv) {
     st.interactive = isatty(0) && isatty(1) && !has_command && script.empty();
     ang::initialize_terminal(st);
     ang::apply_defaults(st);
-    if (st.interactive && !no_config)
+    if (st.interactive && !no_config) {
         ang::load_config(st);
+        if (!ang::g_should_exit)
+            ang::run_startup_tools(st);
+    }
     if (const char *p = getenv("NASH_POSIX"); p && std::string(p) == "1")
         st.posix = true;
     if (st.interactive) {

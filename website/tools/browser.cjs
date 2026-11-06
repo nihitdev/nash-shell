@@ -1,0 +1,38 @@
+const BASE=process.env.NASH_SITE_URL||'http://127.0.0.1:4173';
+const {chromium}=require('playwright');
+(async()=>{
+const browser=await chromium.launch({headless:true,...(process.env.NASH_CHROME?{executablePath:process.env.NASH_CHROME}:{}),args:['--no-sandbox']});
+const page=await browser.newPage({viewport:{width:1440,height:1100}});const errors=[];
+page.on('pageerror',e=>errors.push(e.message));
+await page.goto(`${BASE}/`,{waitUntil:'networkidle'});
+await page.screenshot({path:process.env.NASH_DESKTOP_SCREENSHOT||'/tmp/nash-site-desktop.png',fullPage:true});
+await page.getByRole('button',{name:'Search documentation'}).click();
+await page.getByRole('searchbox',{name:'Search Nash documentation'}).fill('fastfetch');
+await page.locator('.search-result').first().waitFor();
+if(await page.locator('.search-result').count()<1)throw Error('search failed');
+await page.keyboard.press('Escape');
+await page.goto(`${BASE}/tools.html`);
+await page.getByRole('button',{name:'Native support',exact:true}).click();
+if(await page.locator('.tool-card:visible').count()!==4)throw Error('native tools filter');
+await page.locator('#tool-filter').fill('eza');
+if(await page.locator('.tool-card:visible').count()!==1)throw Error('name filter');
+await page.goto(`${BASE}/configure.html`);
+await page.getByRole('checkbox',{name:'Fastfetch at startup'}).check();
+await page.getByRole('checkbox',{name:'Eza shortcuts'}).check();
+const output=await page.locator('#config-output').innerText();
+if(!output.includes('config set integrations.fastfetch.enabled true')||!output.includes('config set integrations.eza.enabled true'))throw Error('config generator');
+const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Download .nash'}).click();const download=await downloadPromise;if(download.suggestedFilename()!=='config.nash')throw Error('config download');
+await page.goto(`${BASE}/docs/configuration.html`);
+if(!await page.getByRole('heading',{name:'Native tool settings',exact:true}).isVisible())throw Error('new docs missing');
+await page.getByRole('button',{name:'Toggle color theme'}).click();
+if(await page.locator('html').getAttribute('data-theme')!=='dark')throw Error('theme toggle');
+await page.reload();if(await page.locator('html').getAttribute('data-theme')!=='dark')throw Error('theme persistence');
+await page.setViewportSize({width:390,height:844});await page.goto(`${BASE}/`);
+await page.screenshot({path:process.env.NASH_MOBILE_SCREENSHOT||'/tmp/nash-site-mobile.png',fullPage:true});
+await page.getByRole('button',{name:'Toggle navigation'}).click();
+if(!await page.locator('.top-nav').isVisible())throw Error('mobile menu');
+for(const path of ['/','/tools.html','/configure.html','/docs/configuration.html']){await page.goto(BASE+path);const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1);if(overflow)throw Error('horizontal overflow '+path);}
+if(errors.length)throw Error(errors.join('\n'));
+console.log('Browser checks passed: desktop/mobile, search, tool filters, config preview/download, theme persistence, navigation, overflow and page errors.');
+await browser.close();
+})().catch(e=>{console.error(e);process.exit(1)});

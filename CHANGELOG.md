@@ -2,6 +2,9 @@
 
 ## 0.2.0 — unreleased
 
+- Add opt-in native Fastfetch startup and managed Eza/Bat shortcuts; preserve user aliases and skip absent tools.
+- Add an Arch-inspired documentation website with searchable handbook, tool directory, themes and local config builder.
+
 - Load config.nash as the primary shell startup file, with validated config and has builtins.
 - Add a user handbook covering configuration, aliases, Fastfetch/popular tools, keys and troubleshooting.
 - Keep legacy TOML as a fallback only when config.nash is absent.

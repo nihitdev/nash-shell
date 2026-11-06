@@ -1,0 +1,13 @@
+{
+  "name": "nash-documentation-site",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "build": "python3 tools/build.py",
+    "check": "python3 tools/check.py",
+    "test:browser": "node tools/browser.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.65.0"
+  }
+}
