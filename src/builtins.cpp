@@ -10,6 +10,7 @@
 #include "util.h"
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <limits.h>
@@ -33,7 +34,7 @@ static int need_args(const std::vector<std::string> &a, size_t n, const std::str
 }
 
 bool is_parent_builtin(const std::string &name) {
-    return name == "cd" || name == "exit" || name == "logout" || name == "export" ||
+    return name == "cd" || name == "take" || name == "exit" || name == "logout" || name == "export" ||
            name == "unset" || name == "set" || name == "alias" || name == "unalias" ||
            name == "abbr" || name == "posix" || name == "source" || name == "." ||
            name == "theme" || name == "autocd" || name == "history" || name == "read" ||
@@ -56,6 +57,20 @@ int run_builtin(const std::vector<std::string> &args, ShellState &st, bool *hand
     }
     if (c == "cd")
         return bi_cd(args, st);
+    if (c == "take") {
+        if (args.size() != 2 || args[1].empty()) {
+            std::cerr << "usage: take DIRECTORY\n";
+            return 2;
+        }
+        const std::string dest = expand_tilde(args[1]);
+        std::error_code ec;
+        std::filesystem::create_directories(dest, ec);
+        if (ec) {
+            std::cerr << "take: " << dest << ": " << ec.message() << "\n";
+            return 1;
+        }
+        return bi_cd({"cd", dest}, st);
+    }
     if (c == "exit" || c == "logout")
         return bi_exit(args, st);
     if (c == "echo")
@@ -402,7 +417,7 @@ int bi_history(const std::vector<std::string> &a, ShellState &st) {
 
 int bi_help(const std::vector<std::string> &, ShellState &) {
     std::cout << "Nash Shell " NASH_VERSION " — fork of ang.sh\n"
-              << "Builtins: cd pwd exit echo export unset set alias unalias abbr posix\n"
+              << "Builtins: cd take pwd exit echo export unset set alias unalias abbr posix\n"
               << "          source history help version true false type theme env printenv\n"
               << "          read jobs fg bg wait integrations nash-prompt config has\n"
               << "Syntax: pipelines, redirections, && || ; &, assignments, quoting, $(...)\n"
